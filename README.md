@@ -112,17 +112,17 @@ download.file(
 )
 w4_best <- read_dta('./data/indderived_w4.dta') # pull in data containing best gen variable in W4
 
-w4_best_gender <- w4_best %>%
+w4_best_gender_empl <- w4_best %>%
     filter(w4_quest_typ == 1) %>% # only want those who did adult questionnaire
-    select(pid, w4_best_gen)
+    select(pid, w4_best_gen, w4_empl_stat, w4_best_race)
 
-# now want to merge the best gender columns into the main data
+# now want to merge the best gender and best employment status columns into the main data
 
 clean_w1_best <- clean_w1 %>%
     left_join(w1_best_gender, by = "pid")
 
 clean_w4_best <- clean_w4 %>%
-    left_join(w4_best_gender, by = "pid")
+    left_join(w4_best_gender_empl, by = "pid")
 
 joined_w1_w4_best <- clean_w1_best %>%
     left_join(clean_w4_best, by = "pid")
@@ -217,24 +217,59 @@ clean_w1 <- clean_w1 %>%
     should I code as NA and then include them in my missing dummy.
 
 ``` r
-consc <- prcomp(na.omit(clean_w1[, c("w1_a_hllfexer", "w1_a_emohope", "w1_a_edter_flipped", "w1_a_hllfsmk")]), center = T, scale. = T)
+consc <- prcomp(na.omit(clean_w1[, c("w1_a_hllfexer",
+                                     "w1_a_emohope",
+                                     "w1_a_edter_flipped",
+                                     "w1_a_hllfsmk")]), 
+                center = T, 
+                scale. = T)
 
 # Create a vector of NAs with original length
 pca_scores <- rep(NA, nrow(clean_w1))
 
 # Get indices of complete cases used in PCA
-complete_rows <- complete.cases(clean_w1[, c("w1_a_hllfexer", "w1_a_emohope", "w1_a_edter_flipped", "w1_a_hllfsmk")])
+complete_rows <- complete.cases(clean_w1[, c("w1_a_hllfexer",
+                                             "w1_a_emohope",
+                                             "w1_a_edter_flipped",
+                                             "w1_a_hllfsmk")])
 
 # Assign PCA scores only to complete cases
 pca_scores[complete_rows] <- consc$x[, 1]
 
 # Now assign back to original dataframe
 clean_w1$w1_a_consc <- pca_scores
-
-
-ols1 <- lm(joined_w1_w4$w4_a_em1pay ~ clean_w1$w1_a_consc)
 ```
 
-# Cleaning W4 education and Wages
+# Run preliminary OLS for proposal
 
-Hello world
+This section runs preliminary OLS models for inclusion into my research
+proposal.
+
+``` r
+joined_w1_w4_best <- joined_w1_w4_best %>%
+    mutate(w4_empl_stat = ifelse(w4_empl_stat == -8, NA, w4_empl_stat)) %>%  # code those who refused to answer as missing (15 people)
+    mutate(w4_employed = ifelse(w4_empl_stat == 3, 1, 0)) %>% 
+    mutate(w4_best_gen = as.factor(w4_best_gen)) %>%  # coding gender as a categorical variable
+    mutate(w4_best_race = as.factor(w4_best_race))
+
+ols1 <- lm_robust(joined_w1_w4_best$w4_employed ~ clean_w1$w1_a_consc + joined_w1_w4_best$w4_best_gen + joined_w1_w4_best$w4_best_race)
+
+print(ols1)
+```
+
+    ##                                     Estimate  Std. Error     t value
+    ## (Intercept)                      0.585037856 0.014084220  41.5385348
+    ## clean_w1$w1_a_consc             -0.007816438 0.008957453  -0.8726184
+    ## joined_w1_w4_best$w4_best_gen2  -0.222080134 0.018882481 -11.7611732
+    ## joined_w1_w4_best$w4_best_race2  0.178565335 0.028991267   6.1592802
+    ## joined_w1_w4_best$w4_best_race3 -0.011294700 0.084027026  -0.1344175
+    ## joined_w1_w4_best$w4_best_race4  0.453812566 0.059222950   7.6627822
+    ##                                      Pr(>|t|)    CI Lower     CI Upper   DF
+    ## (Intercept)                     5.620115e-298  0.55742208  0.612653629 2982
+    ## clean_w1$w1_a_consc              3.829414e-01 -0.02537985  0.009746976 2982
+    ## joined_w1_w4_best$w4_best_gen2   2.999979e-31 -0.25910415 -0.185056123 2982
+    ## joined_w1_w4_best$w4_best_race2  8.288049e-10  0.12172042  0.235410247 2982
+    ## joined_w1_w4_best$w4_best_race3  8.930815e-01 -0.17605152  0.153462118 2982
+    ## joined_w1_w4_best$w4_best_race4  2.443765e-14  0.33769058  0.569934548 2982
+
+# Cleaning W4 education and Wages

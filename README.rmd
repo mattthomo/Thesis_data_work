@@ -9,7 +9,7 @@ This README captures all my code which I had used in the creation of my thesis f
 
 rm(list = ls()) # Clean your environment:
 gc() # garbage collection - It can be useful to call gc after a large object has been removed, as this may prompt R to return memory to the operating system.
-pacman::p_load(tidyverse, foreign, haven)
+pacman::p_load(tidyverse, foreign, haven, estimatr)
 list.files('code/', full.names = T, recursive = T) %>% .[grepl('.R', .)] %>% as.list() %>% walk(~source(.))
 ```
 
@@ -108,17 +108,17 @@ download.file(
 )
 w4_best <- read_dta('./data/indderived_w4.dta') # pull in data containing best gen variable in W4
 
-w4_best_gender <- w4_best %>%
+w4_best_gender_empl <- w4_best %>%
     filter(w4_quest_typ == 1) %>% # only want those who did adult questionnaire
-    select(pid, w4_best_gen)
+    select(pid, w4_best_gen, w4_empl_stat, w4_best_race)
 
-# now want to merge the best gender columns into the main data
+# now want to merge the best gender and best employment status columns into the main data
 
 clean_w1_best <- clean_w1 %>%
     left_join(w1_best_gender, by = "pid")
 
 clean_w4_best <- clean_w4 %>%
-    left_join(w4_best_gender, by = "pid")
+    left_join(w4_best_gender_empl, by = "pid")
 
 joined_w1_w4_best <- clean_w1_best %>%
     left_join(clean_w4_best, by = "pid")
@@ -190,13 +190,21 @@ clean_w1 <- clean_w1 %>%
     -   Some entries coded as -3 or 25 (these mean something). In this case, should I code as NA and then include them in my missing dummy.
     
 ```{r}
-consc <- prcomp(na.omit(clean_w1[, c("w1_a_hllfexer", "w1_a_emohope", "w1_a_edter_flipped", "w1_a_hllfsmk")]), center = T, scale. = T)
+consc <- prcomp(na.omit(clean_w1[, c("w1_a_hllfexer",
+                                     "w1_a_emohope",
+                                     "w1_a_edter_flipped",
+                                     "w1_a_hllfsmk")]), 
+                center = T, 
+                scale. = T)
 
 # Create a vector of NAs with original length
 pca_scores <- rep(NA, nrow(clean_w1))
 
 # Get indices of complete cases used in PCA
-complete_rows <- complete.cases(clean_w1[, c("w1_a_hllfexer", "w1_a_emohope", "w1_a_edter_flipped", "w1_a_hllfsmk")])
+complete_rows <- complete.cases(clean_w1[, c("w1_a_hllfexer",
+                                             "w1_a_emohope",
+                                             "w1_a_edter_flipped",
+                                             "w1_a_hllfsmk")])
 
 # Assign PCA scores only to complete cases
 pca_scores[complete_rows] <- consc$x[, 1]
@@ -205,10 +213,28 @@ pca_scores[complete_rows] <- consc$x[, 1]
 clean_w1$w1_a_consc <- pca_scores
 
 
-ols1 <- lm(joined_w1_w4$w4_a_em1pay ~ clean_w1$w1_a_consc)
+
 ```
+
+# Run preliminary OLS for proposal
+
+This section runs preliminary OLS models for inclusion into my research proposal.
+
+```{r OLS: W1 conscientiousness on W4 employment status}
+
+joined_w1_w4_best <- joined_w1_w4_best %>%
+    mutate(w4_empl_stat = ifelse(w4_empl_stat == -8, NA, w4_empl_stat)) %>%  # code those who refused to answer as missing (15 people)
+    mutate(w4_employed = ifelse(w4_empl_stat == 3, 1, 0)) %>% 
+    mutate(w4_best_gen = as.factor(w4_best_gen)) %>%  # coding gender as a categorical variable
+    mutate(w4_best_race = as.factor(w4_best_race))
+
+ols1 <- lm_robust(joined_w1_w4_best$w4_employed ~ clean_w1$w1_a_consc + joined_w1_w4_best$w4_best_gen + joined_w1_w4_best$w4_best_race)
+
+print(ols1)
+```
+
 
 # Cleaning W4 education and Wages 
 
-Hello world
+
 
