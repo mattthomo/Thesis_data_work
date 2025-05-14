@@ -9,7 +9,7 @@ This README captures all my code which I had used in the creation of my thesis f
 
 rm(list = ls()) # Clean your environment:
 gc() # garbage collection - It can be useful to call gc after a large object has been removed, as this may prompt R to return memory to the operating system.
-pacman::p_load(tidyverse, foreign, haven, estimatr)
+pacman::p_load(tidyverse, foreign, haven, estimatr, broom, kableExtra)
 list.files('code/', full.names = T, recursive = T) %>% .[grepl('.R', .)] %>% as.list() %>% walk(~source(.))
 ```
 
@@ -35,6 +35,7 @@ download.file(
     'https://www.dropbox.com/scl/fi/3ggfkjhj55z09i11e40ft/Adult_W4_Anon_V2.0.0.dta?rlkey=wjrlq33ggrohe5o8z3mpjsrda&st=ul2l4ay9&dl=1',
     './data/w4_adult_anon.dta'
 )
+
 w4 <- read_dta('./data/w4_adult_anon.dta')
 ```
 
@@ -189,7 +190,7 @@ clean_w1 <- clean_w1 %>%
     -   Convert entries such that all go in same direction, i.e. that higher value indicates higher conscientiousness
     -   Some entries coded as -3 or 25 (these mean something). In this case, should I code as NA and then include them in my missing dummy.
     
-```{r}
+```{r Make conscientiousness and missing conscientiousness variables}
 consc <- prcomp(na.omit(clean_w1[, c("w1_a_hllfexer",
                                      "w1_a_emohope",
                                      "w1_a_edter_flipped",
@@ -228,9 +229,55 @@ joined_w1_w4_best <- joined_w1_w4_best %>%
     mutate(w4_best_gen = as.factor(w4_best_gen)) %>%  # coding gender as a categorical variable
     mutate(w4_best_race = as.factor(w4_best_race))
 
-ols1 <- lm_robust(joined_w1_w4_best$w4_employed ~ clean_w1$w1_a_consc + joined_w1_w4_best$w4_best_gen + joined_w1_w4_best$w4_best_race)
+joined_w1_w4_best$w1_a_consc <- pca_scores
 
-print(ols1)
+ols1 <- lm_robust(w4_employed ~ w1_a_consc + w4_best_gen + w4_best_race,
+                  data = joined_w1_w4_best)
+
+
+saveRDS(results_tbl, file = "./output/proposal_table1.rds")
+
+
+library(modelsummary)
+library(kableExtra)
+
+model_list <- ols1
+# Generate kableExtra table directly
+ols1_output <- modelsummary(
+    list("Employed = 1" = ols1),
+    stars = c('*' = .1, '**' = .05, '***' = .01),
+    coef_map = c(
+        "Intercept" = "Constant",
+        "w1_a_consc" = "Conscientiousness",
+        "w4_best_gen2" = "Female",
+        "w4_best_race2" = "Coloured",
+        "w4_best_race3" = "Asian/Indian",
+        "w4_best_race4" = "White"),
+    output = "kableExtra",
+    notes = "Robust standard errors reported in parentheses",
+    title = getOption("Preliminary OLS relationship between employment status and
+          conscientiousness", default = NULL))
+ols1_output
+saveRDS(ols1_output, file = "./output/ols1_output.rds") 
+
+    kable_styling(full_width = FALSE,
+                              bootstrap_options = c("striped", "hover")) %>% 
+    kable(format = "latex")
+
+latex_table_clean <- gsub("\u2212", "-", ols1_output)
+
+writeLines(latex_table_clean, "./output/ols1_output.md")
+
+
+writeLines(ols1_output, "./output/ols1_output.md")
+
+reg_table_renamed <- table1 %>%
+  rename(
+    Variable = term,
+    OLS_Model_1 = `Model 1`,
+    OLS_Model_2 = `Model 2`
+  )
+
 ```
 
 
