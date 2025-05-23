@@ -9,7 +9,7 @@ This README captures all my code which I had used in the creation of my thesis f
 
 rm(list = ls()) # Clean your environment:
 gc() # garbage collection - It can be useful to call gc after a large object has been removed, as this may prompt R to return memory to the operating system.
-pacman::p_load(tidyverse, foreign, haven, estimatr, broom, kableExtra)
+pacman::p_load(tidyverse, foreign, haven, estimatr, broom, kableExtra, FactoMineR)
 list.files('code/', full.names = T, recursive = T) %>% .[grepl('.R', .)] %>% as.list() %>% walk(~source(.))
 ```
 
@@ -45,7 +45,7 @@ w4 <- read_dta('./data/w4_adult_anon.dta')
 
 ```{r Cleaning W1}
 clean_w1 <- w1 %>% 
-    select(pid, w1_a_dob_m, w1_a_dob_y, w1_a_gen, w1_a_unemmn, w1_a_hllfexer, w1_a_emohope, w1_a_aspen, w1_a_edter, w1_a_hllfsmk, w1_a_edintter, w1_a_wbsat) %>% # selecting our questions which proxied for measures of conscientiousness
+    select(pid, w1_a_dob_m, w1_a_dob_y, w1_a_gen, w1_a_unemmn, w1_a_hllfexer, w1_a_emohope, w1_a_aspen, w1_a_edter, w1_a_hllfsmk, w1_a_edintter, w1_a_wbsat, w1_a_hldifmon) %>% # selecting our questions which proxied for measures of conscientiousness
     mutate(Age = 2008 - w1_a_dob_y) %>% # creating age variable 
     filter(Age >= 14 & Age <=23) %>% # filter for those aged 14-23 at time of interview
     select(-c(w1_a_dob_m, w1_a_dob_y)) # remove unnecessary data
@@ -155,6 +155,8 @@ First, need to narrow down scope of proxies to 4 of the most important potential
 
 -   M5: "Using a scale of 1 to 10 where 1 means “Very dissatisfied” and 10 means “Very satisfied”, how do you feel about your life as a whole right now?". *(498/ 4148 missing)*. Very weak correlate of conscientiousness I think.
 
+-   J24.7: "Indicate the level of difficulty you have with managing money (if you had to)"
+
 - Maybe something to do with income such as investing or being in a stokvel. Would be tricky due to effect of level of income on this.
 
 Now can create dummy variable coding missing values as 1 and valid entries as 0.
@@ -162,21 +164,11 @@ Now can create dummy variable coding missing values as 1 and valid entries as 0.
 ```{r Conscientiousness dummies}
 # start by only selecting variables which we have narrowed study down to
 clean_w1 <- clean_w1 %>% 
-    select(pid, w1_a_hllfexer, w1_a_emohope, w1_a_edter, w1_a_edintter, w1_a_hllfsmk, w1_a_wbsat) %>% 
-    # first want to create dummies for missing variables
-    mutate(w1_a_hllfexer_miss = ifelse(w1_a_hllfexer %in% c(-9, -8, -5, -3) | is.na(w1_a_hllfexer), 1, 0)) %>% 
-    mutate(w1_a_emohope_miss = ifelse(w1_a_emohope %in% c(-9, -8, -5, -3) | is.na(w1_a_emohope), 1, 0)) %>% 
-    mutate(w1_a_edter_miss = ifelse(w1_a_edter %in% c(-9, -8, -5, -3) | is.na(w1_a_edter), 1, 0)) %>% 
-    mutate(w1_a_edintter_miss = ifelse(w1_a_edintter %in% c(-9, -8, -5, -3) | is.na(w1_a_edintter), 1, 0)) %>% 
-    mutate(w1_a_hllfsmk_miss = ifelse(w1_a_hllfsmk %in% c(-9, -8, -5, -3) | is.na(w1_a_hllfsmk), 1, 0)) %>%
-    mutate(w1_a_wbsat_miss = ifelse(w1_a_wbsat %in% c(-9, -8, -5, -3) | is.na(w1_a_wbsat), 1, 0)) %>% 
+    select(pid, w1_a_hllfexer, w1_a_emohope, w1_a_edter, w1_a_edintter, w1_a_hllfsmk, w1_a_wbsat, w1_a_hldifmon) %>% 
+    # create conscientiousness dummy
+    consc_dummy(c("w1_a_hllfexer", "w1_a_emohope", "w1_a_edter", "w1_a_edintter", "w1_a_hllfsmk", "w1_a_wbsat", "w1_a_hldifmon")) %>% 
     # now want to make sure that all these values get coded as missing in original columns
-    mutate(w1_a_hllfexer = ifelse(w1_a_hllfexer %in% c(-9, -8, -5, -3), NA, w1_a_hllfexer)) %>% 
-    mutate(w1_a_emohope = ifelse(w1_a_emohope %in% c(-9, -8, -5, -3), NA, w1_a_emohope)) %>% 
-    mutate(w1_a_edter = ifelse(w1_a_edter %in% c(-9, -8, -5, -3), NA, w1_a_edter)) %>% 
-    mutate(w1_a_edintter = ifelse(w1_a_edintter %in% c(-9, -8, -5, -3), NA, w1_a_edintter)) %>% 
-    mutate(w1_a_hllfsmk = ifelse(w1_a_hllfsmk %in% c(-9, -8, -5, -3), NA, w1_a_hllfsmk)) %>% 
-    mutate(w1_a_wbsat = ifelse(w1_a_wbsat %in% c(-9, -8, -5, -3), NA, w1_a_wbsat)) %>% 
+    nids_miss(c("w1_a_hllfexer", "w1_a_emohope", "w1_a_edter", "w1_a_edintter", "w1_a_hllfsmk", "w1_a_wbsat", "w1_a_hldifmon"))%>% 
     #also need to make sure that all variables are increasing in conscientiousness in same direction
     mutate(w1_a_edter_flipped = 3 - w1_a_edter)
 ```
@@ -212,9 +204,6 @@ pca_scores[complete_rows] <- consc$x[, 1]
 
 # Now assign back to original dataframe
 clean_w1$w1_a_consc <- pca_scores
-
-
-
 ```
 
 # Run preliminary OLS for proposal
@@ -227,60 +216,118 @@ joined_w1_w4_best <- joined_w1_w4_best %>%
     mutate(w4_empl_stat = ifelse(w4_empl_stat == -8, NA, w4_empl_stat)) %>%  # code those who refused to answer as missing (15 people)
     mutate(w4_employed = ifelse(w4_empl_stat == 3, 1, 0)) %>% 
     mutate(w4_best_gen = as.factor(w4_best_gen)) %>%  # coding gender as a categorical variable
-    mutate(w4_best_race = as.factor(w4_best_race))
+    mutate(w4_best_race = as.factor(w4_best_race)) # coding race as a categorical variable
 
 joined_w1_w4_best$w1_a_consc <- pca_scores
 
-ols1 <- lm_robust(w4_employed ~ w1_a_consc + w4_best_gen + w4_best_race,
-                  data = joined_w1_w4_best)
+```
+
+```{r Make table for proposal, include=FALSE}
+# ols1 <- lm_robust(w4_employed ~ w1_a_consc + w4_best_gen + w4_best_race,
+#                   data = joined_w1_w4_best)
+# 
+# 
+# saveRDS(results_tbl, file = "./output/proposal_table1.rds")
+# 
+# 
+# library(modelsummary)
+# library(kableExtra)
+# 
+# model_list <- ols1
+# # Generate kableExtra table directly
+# ols1_output <- modelsummary(
+#     list("Employed = 1" = ols1),
+#     stars = c('*' = .1, '**' = .05, '***' = .01),
+#     coef_map = c(
+#         "Intercept" = "Constant",
+#         "w1_a_consc" = "Conscientiousness",
+#         "w4_best_gen2" = "Female",
+#         "w4_best_race2" = "Coloured",
+#         "w4_best_race3" = "Asian/Indian",
+#         "w4_best_race4" = "White"),
+#     output = "kableExtra",
+#     notes = "Robust standard errors reported in parentheses",
+#     title = getOption("Preliminary OLS relationship between employment status and
+#           conscientiousness", default = NULL))
+# ols1_output
+# saveRDS(ols1_output, file = "./output/ols1_output.rds") 
+# 
+#     kable_styling(full_width = FALSE,
+#                               bootstrap_options = c("striped", "hover")) %>% 
+#     kable(format = "latex")
+# 
+# latex_table_clean <- gsub("\u2212", "-", ols1_output)
+# 
+# writeLines(latex_table_clean, "./output/ols1_output.md")
+# 
+# 
+# writeLines(ols1_output, "./output/ols1_output.md")
+# 
+# reg_table_renamed <- table1 %>%
+#   rename(
+#     Variable = term,
+#     OLS_Model_1 = `Model 1`,
+#     OLS_Model_2 = `Model 2`
+#   )
+```
 
 
-saveRDS(results_tbl, file = "./output/proposal_table1.rds")
+# Continue work on OLS
 
+The following chunks are my post-proposal code and serve to continue the work to getting to an OLS model with additional controls.
 
-library(modelsummary)
-library(kableExtra)
+## Create wealth measure (asset index) with MCA
 
-model_list <- ols1
-# Generate kableExtra table directly
-ols1_output <- modelsummary(
-    list("Employed = 1" = ols1),
-    stars = c('*' = .1, '**' = .05, '***' = .01),
-    coef_map = c(
-        "Intercept" = "Constant",
-        "w1_a_consc" = "Conscientiousness",
-        "w4_best_gen2" = "Female",
-        "w4_best_race2" = "Coloured",
-        "w4_best_race3" = "Asian/Indian",
-        "w4_best_race4" = "White"),
-    output = "kableExtra",
-    notes = "Robust standard errors reported in parentheses",
-    title = getOption("Preliminary OLS relationship between employment status and
-          conscientiousness", default = NULL))
-ols1_output
-saveRDS(ols1_output, file = "./output/ols1_output.rds") 
+Use MCA to construct a measure of wealth of individuals. This measure can then be used as a control in the model.
 
-    kable_styling(full_width = FALSE,
-                              bootstrap_options = c("striped", "hover")) %>% 
-    kable(format = "latex")
+```{r Create wealth MCA}
+# pull variables into df which give us info on asset ownership
+clean_w1 <- clean_w1 %>%  
+    left_join(select(w1, pid, w1_a_ownrad, w1_a_ownvehpri, w1_a_ownmot, w1_a_owncom, w1_a_owncel), by = "pid") %>% 
+    nids_miss(c("w1_a_ownrad", "w1_a_ownvehpri", "w1_a_ownmot", "w1_a_owncom", "w1_a_owncel"))
 
-latex_table_clean <- gsub("\u2212", "-", ols1_output)
+# testing to see if my mutate command worked to code any `2`, i.e. `No`, responses as 0 and leaving 1 = yes     
+test_mut <- clean_w1 %>% 
+    mutate(across(c("w1_a_ownrad", "w1_a_ownvehpri", "w1_a_ownmot", "w1_a_owncom", "w1_a_owncel"), ~ ifelse(.x == 2, 0, .x)))
 
-writeLines(latex_table_clean, "./output/ols1_output.md")
+# Liam's MCA code
+# binary_matrix <-
+#   round7[, c("nrad","bradb","NOrad", "ntv","btvb","NOtv", "nveh","bvehb","NOveh", "ncom","bcomb", "NOcom", "npho", "bphob","NOpho",  "nban",     "bbanb", "NOban")]
+# #creating MCA
+# mca_result <- MCA(binary_matrix,graph = TRUE)
+# round7$assdex <-
+#   mca_result$ind$coord[, 1]
+# round7$assdex  <-
+#   (round7$assdex  + abs(min(round7$assdex)))# no negative
+# print(mca_result$var$coord[, 1])
+# remove(mca_result)
+# remove(binary_matrix)
 
+# Select the asset ownership columns
+asset_vars <- clean_w1 %>%
+  select(w1_a_ownrad, w1_a_ownvehpri, w1_a_ownmot, w1_a_owncom, w1_a_owncel)
 
-writeLines(ols1_output, "./output/ols1_output.md")
-
-reg_table_renamed <- table1 %>%
-  rename(
-    Variable = term,
-    OLS_Model_1 = `Model 1`,
-    OLS_Model_2 = `Model 2`
-  )
+######Stopped here ##########
+# Select the asset ownership columns
+# asset_vars <- df %>%
+#   select(car, radio, cellphone, computer, fridge, tv)
+# 
+# # Convert asset vars to factors (MCA requires categorical variables)
+# asset_factors <- asset_vars %>%
+#   mutate(across(everything(), as.factor))
+# 
+# # Run MCA
+# mca_result <- MCA(asset_factors, graph = FALSE)
+# 
+# # Extract the coordinates of individuals on the first dimension
+# asset_index <- mca_result$ind$coord[, 1]
+# 
+# # Add the asset index as a new column to your original dataframe
+# df <- df %>%
+#   mutate(asset_index = asset_index)
 
 ```
 
 
-# Cleaning W4 education and Wages 
 
 

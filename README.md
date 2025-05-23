@@ -28,6 +28,7 @@ download.file(
     'https://www.dropbox.com/scl/fi/3ggfkjhj55z09i11e40ft/Adult_W4_Anon_V2.0.0.dta?rlkey=wjrlq33ggrohe5o8z3mpjsrda&st=ul2l4ay9&dl=1',
     './data/w4_adult_anon.dta'
 )
+
 w4 <- read_dta('./data/w4_adult_anon.dta')
 ```
 
@@ -38,7 +39,7 @@ w4 <- read_dta('./data/w4_adult_anon.dta')
 
 ``` r
 clean_w1 <- w1 %>% 
-    select(pid, w1_a_dob_m, w1_a_dob_y, w1_a_gen, w1_a_unemmn, w1_a_hllfexer, w1_a_emohope, w1_a_aspen, w1_a_edter, w1_a_hllfsmk, w1_a_edintter, w1_a_wbsat) %>% # selecting our questions which proxied for measures of conscientiousness
+    select(pid, w1_a_dob_m, w1_a_dob_y, w1_a_gen, w1_a_unemmn, w1_a_hllfexer, w1_a_emohope, w1_a_aspen, w1_a_edter, w1_a_hllfsmk, w1_a_edintter, w1_a_wbsat, w1_a_hldifmon) %>% # selecting our questions which proxied for measures of conscientiousness
     mutate(Age = 2008 - w1_a_dob_y) %>% # creating age variable 
     filter(Age >= 14 & Age <=23) %>% # filter for those aged 14-23 at time of interview
     select(-c(w1_a_dob_m, w1_a_dob_y)) # remove unnecessary data
@@ -177,6 +178,9 @@ potential proxies. These are the 4 I’ve chosen:
   right now?“. *(498/ 4148 missing)*. Very weak correlate of
   conscientiousness I think.
 
+- J24.7: “Indicate the level of difficulty you have with managing money
+  (if you had to)”
+
 - Maybe something to do with income such as investing or being in a
   stokvel. Would be tricky due to effect of level of income on this.
 
@@ -186,21 +190,11 @@ entries as 0.
 ``` r
 # start by only selecting variables which we have narrowed study down to
 clean_w1 <- clean_w1 %>% 
-    select(pid, w1_a_hllfexer, w1_a_emohope, w1_a_edter, w1_a_edintter, w1_a_hllfsmk, w1_a_wbsat) %>% 
-    # first want to create dummies for missing variables
-    mutate(w1_a_hllfexer_miss = ifelse(w1_a_hllfexer %in% c(-9, -8, -5, -3) | is.na(w1_a_hllfexer), 1, 0)) %>% 
-    mutate(w1_a_emohope_miss = ifelse(w1_a_emohope %in% c(-9, -8, -5, -3) | is.na(w1_a_emohope), 1, 0)) %>% 
-    mutate(w1_a_edter_miss = ifelse(w1_a_edter %in% c(-9, -8, -5, -3) | is.na(w1_a_edter), 1, 0)) %>% 
-    mutate(w1_a_edintter_miss = ifelse(w1_a_edintter %in% c(-9, -8, -5, -3) | is.na(w1_a_edintter), 1, 0)) %>% 
-    mutate(w1_a_hllfsmk_miss = ifelse(w1_a_hllfsmk %in% c(-9, -8, -5, -3) | is.na(w1_a_hllfsmk), 1, 0)) %>%
-    mutate(w1_a_wbsat_miss = ifelse(w1_a_wbsat %in% c(-9, -8, -5, -3) | is.na(w1_a_wbsat), 1, 0)) %>% 
+    select(pid, w1_a_hllfexer, w1_a_emohope, w1_a_edter, w1_a_edintter, w1_a_hllfsmk, w1_a_wbsat, w1_a_hldifmon) %>% 
+    # create conscientiousness dummy
+    consc_dummy(c("w1_a_hllfexer", "w1_a_emohope", "w1_a_edter", "w1_a_edintter", "w1_a_hllfsmk", "w1_a_wbsat", "w1_a_hldifmon")) %>% 
     # now want to make sure that all these values get coded as missing in original columns
-    mutate(w1_a_hllfexer = ifelse(w1_a_hllfexer %in% c(-9, -8, -5, -3), NA, w1_a_hllfexer)) %>% 
-    mutate(w1_a_emohope = ifelse(w1_a_emohope %in% c(-9, -8, -5, -3), NA, w1_a_emohope)) %>% 
-    mutate(w1_a_edter = ifelse(w1_a_edter %in% c(-9, -8, -5, -3), NA, w1_a_edter)) %>% 
-    mutate(w1_a_edintter = ifelse(w1_a_edintter %in% c(-9, -8, -5, -3), NA, w1_a_edintter)) %>% 
-    mutate(w1_a_hllfsmk = ifelse(w1_a_hllfsmk %in% c(-9, -8, -5, -3), NA, w1_a_hllfsmk)) %>% 
-    mutate(w1_a_wbsat = ifelse(w1_a_wbsat %in% c(-9, -8, -5, -3), NA, w1_a_wbsat)) %>% 
+    nids_miss(c("w1_a_hllfexer", "w1_a_emohope", "w1_a_edter", "w1_a_edintter", "w1_a_hllfsmk", "w1_a_wbsat", "w1_a_hldifmon"))%>% 
     #also need to make sure that all variables are increasing in conscientiousness in same direction
     mutate(w1_a_edter_flipped = 3 - w1_a_edter)
 ```
@@ -250,28 +244,64 @@ joined_w1_w4_best <- joined_w1_w4_best %>%
     mutate(w4_empl_stat = ifelse(w4_empl_stat == -8, NA, w4_empl_stat)) %>%  # code those who refused to answer as missing (15 people)
     mutate(w4_employed = ifelse(w4_empl_stat == 3, 1, 0)) %>% 
     mutate(w4_best_gen = as.factor(w4_best_gen)) %>%  # coding gender as a categorical variable
-    mutate(w4_best_race = as.factor(w4_best_race))
+    mutate(w4_best_race = as.factor(w4_best_race)) # coding race as a categorical variable
 
-ols1 <- lm_robust(joined_w1_w4_best$w4_employed ~ clean_w1$w1_a_consc + joined_w1_w4_best$w4_best_gen + joined_w1_w4_best$w4_best_race)
-
-print(ols1)
+joined_w1_w4_best$w1_a_consc <- pca_scores
 ```
 
-    ##                                     Estimate  Std. Error     t value
-    ## (Intercept)                      0.585037856 0.014084220  41.5385348
-    ## clean_w1$w1_a_consc             -0.007816438 0.008957453  -0.8726184
-    ## joined_w1_w4_best$w4_best_gen2  -0.222080134 0.018882481 -11.7611732
-    ## joined_w1_w4_best$w4_best_race2  0.178565335 0.028991267   6.1592802
-    ## joined_w1_w4_best$w4_best_race3 -0.011294700 0.084027026  -0.1344175
-    ## joined_w1_w4_best$w4_best_race4  0.453812566 0.059222950   7.6627822
-    ##                                      Pr(>|t|)    CI Lower     CI Upper   DF
-    ## (Intercept)                     5.620115e-298  0.55742208  0.612653629 2982
-    ## clean_w1$w1_a_consc              3.829414e-01 -0.02537985  0.009746976 2982
-    ## joined_w1_w4_best$w4_best_gen2   2.999979e-31 -0.25910415 -0.185056123 2982
-    ## joined_w1_w4_best$w4_best_race2  8.288049e-10  0.12172042  0.235410247 2982
-    ## joined_w1_w4_best$w4_best_race3  8.930815e-01 -0.17605152  0.153462118 2982
-    ## joined_w1_w4_best$w4_best_race4  2.443765e-14  0.33769058  0.569934548 2982
+# Continue work on OLS
 
-# Cleaning W4 education and Wages
+The following chunks are my post-proposal code and serve to continue the
+work to getting to an OLS model with additional controls.
 
-Hello world
+## Create wealth measure (asset index) with MCA
+
+Use MCA to construct a measure of wealth of individuals. This measure
+can then be used as a control in the model.
+
+``` r
+# pull variables into df which give us info on asset ownership
+clean_w1 <- clean_w1 %>%  
+    left_join(select(w1, pid, w1_a_ownrad, w1_a_ownvehpri, w1_a_ownmot, w1_a_owncom, w1_a_owncel), by = "pid") %>% 
+    nids_miss(c("w1_a_ownrad", "w1_a_ownvehpri", "w1_a_ownmot", "w1_a_owncom", "w1_a_owncel"))
+
+# testing to see if my mutate command worked to code any `2`, i.e. `No`, responses as 0 and leaving 1 = yes     
+test_mut <- clean_w1 %>% 
+    mutate(across(c("w1_a_ownrad", "w1_a_ownvehpri", "w1_a_ownmot", "w1_a_owncom", "w1_a_owncel"), ~ ifelse(.x == 2, 0, .x)))
+
+# Liam's MCA code
+# binary_matrix <-
+#   round7[, c("nrad","bradb","NOrad", "ntv","btvb","NOtv", "nveh","bvehb","NOveh", "ncom","bcomb", "NOcom", "npho", "bphob","NOpho",  "nban",     "bbanb", "NOban")]
+# #creating MCA
+# mca_result <- MCA(binary_matrix,graph = TRUE)
+# round7$assdex <-
+#   mca_result$ind$coord[, 1]
+# round7$assdex  <-
+#   (round7$assdex  + abs(min(round7$assdex)))# no negative
+# print(mca_result$var$coord[, 1])
+# remove(mca_result)
+# remove(binary_matrix)
+
+# Select the asset ownership columns
+asset_vars <- clean_w1 %>%
+  select(w1_a_ownrad, w1_a_ownvehpri, w1_a_ownmot, w1_a_owncom, w1_a_owncel)
+
+######Stopped here ##########
+# Select the asset ownership columns
+# asset_vars <- df %>%
+#   select(car, radio, cellphone, computer, fridge, tv)
+# 
+# # Convert asset vars to factors (MCA requires categorical variables)
+# asset_factors <- asset_vars %>%
+#   mutate(across(everything(), as.factor))
+# 
+# # Run MCA
+# mca_result <- MCA(asset_factors, graph = FALSE)
+# 
+# # Extract the coordinates of individuals on the first dimension
+# asset_index <- mca_result$ind$coord[, 1]
+# 
+# # Add the asset index as a new column to your original dataframe
+# df <- df %>%
+#   mutate(asset_index = asset_index)
+```
