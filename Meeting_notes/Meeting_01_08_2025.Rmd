@@ -1,17 +1,47 @@
 ---
-title: "Meeting_01_08_2025"
+title: "Meeting 1 August 2025"
 author: "Matthew"
-date: "2025-07-31"
-output: github_document
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(kableExtra, tidyverse)
 ```
 
 # Key points
 
-- Constructed wealth index
+- Constructed wealth index function
     - Using the parent id variables, I matched the monetary asset values of the parents to their children from our target group.
-- Got OLS estimates for a model with log income (model 1) and employment status (model 2) both from wave 4 as depedent variables.
+    - Code for this function found [here](https://github.com/mattthomo/Thesis_data_work/blob/main/code/create_wealth_index.R)
+- Got OLS estimates for a model with log income (model 1) and employment status (model 2) both from wave 4 as dependent variables.
+- 
+
+# Results
+
+## Model 1
+
+```{r Model 1, results='asis'}
+tab1 <- read_rds("~/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/tab1.rds")
+
+tab1 %>% kable(format = "html",
+               booktabs = T,
+               caption = "W1 Conscientiousness on W4 (log) income") %>% 
+    row_spec(3, bold = T)
+
+```
+
+## Model 2
+
+
+
+
+# Questions
+
+- As results not significant and/or show relationship in direction opposite to what we had expected, next step?
+    - Had lots of observations dropped due to missing entries
+    - Still go ahead with more complexed estimation techniques?
+    - Go back and change specification of conscientiousness variable, or find source of missingness
+    - Simulations? (how to I'm not sure but sounded promising after yesterday's lecture)
+
 
