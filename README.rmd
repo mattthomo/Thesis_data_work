@@ -319,10 +319,36 @@ wealth_age <- wealth %>% left_join(w1_best %>% select(pid, w1_best_age_yrs), by 
 joined_w1_w4_best <- joined_w1_w4_best %>% 
      left_join(wealth_age %>% select(pid, l_total_assets_pc), by = "pid")
 
-ols1 <- lm_robust(w4_employed ~ w1_a_consc + w4_best_gen + w4_best_race + l_total_assets_pc,
+ols1 <- lm_robust(w4_employed ~ w1_a_consc 
+                  + w4_best_gen + w4_best_race + l_total_assets_pc,
                    data = joined_w1_w4_best)
  summary(ols1) 
 
+
+# Create a tibble with estimates, p-values, and significance stars
+
+table_1 <- tidy(ols1) %>%
+  filter(!is.na(estimate)) %>%  # remove dropped coefficients
+  mutate(
+    stars = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      p.value < 0.1   ~ ".",
+      TRUE            ~ ""
+    ),
+    estimate = round(estimate, 3),
+    estimate = paste0(estimate, stars),
+    std.error = round(std.error, 3),
+    p.value = signif(p.value, 3),
+    std.error = paste0("(", std.error, ")")
+  ) %>%
+  select(term, estimate, std.error, p.value) 
+
+write_rds(table_1, "./output/tab1.rds")
+
+
+ 
  # create total income variable for W4
  w4_best <- w4_best %>% mutate(total_inc = rowSums(.[, 17:42], na.rm = T))
  
@@ -342,6 +368,26 @@ joined_w1_w4_best <- joined_w1_w4_best %>%
  ols2 <- lm(l_total_inc ~ w1_a_consc + w4_best_gen + w4_best_race + l_total_assets_pc,
                   data = joined_w1_w4_best)
 
+ table_2 <- tidy(ols2) %>%
+  filter(!is.na(estimate)) %>%  # remove dropped coefficients
+  mutate(
+    stars = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      p.value < 0.1   ~ ".",
+      TRUE            ~ ""
+    ),
+    estimate = round(estimate, 3),
+    estimate = paste0(estimate, stars),
+    std.error = round(std.error, 3),
+    p.value = signif(p.value, 3),
+    std.error = paste0("(", std.error, ")")
+  ) %>%
+  select(term, estimate, std.error, p.value) 
+ 
+ write_rds(table_2, "./output/tab2.rds")
+ 
 summary(ols2)
 ```
 

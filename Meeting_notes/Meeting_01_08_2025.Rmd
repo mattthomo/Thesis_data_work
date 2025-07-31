@@ -1,7 +1,7 @@
 ---
 title: "Meeting 1 August 2025"
 author: "Matthew"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
@@ -14,24 +14,32 @@ pacman::p_load(kableExtra, tidyverse)
 - Constructed wealth index function
     - Using the parent id variables, I matched the monetary asset values of the parents to their children from our target group.
     - Code for this function found [here](https://github.com/mattthomo/Thesis_data_work/blob/main/code/create_wealth_index.R)
-- Got OLS estimates for a model with log income (model 1) and employment status (model 2) both from wave 4 as dependent variables.
+- Got OLS estimates for a model with employment status (model 1) and log income (model 2) both from wave 4 as dependent variables.
 - 
 
 # Results
 
 ## Model 1
 
-```{r Model 1, results='asis'}
+```{r Model 1, results='asis', echo=FALSE}
 tab1 <- read_rds("~/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/tab1.rds")
 
 tab1 %>% kable(format = "html",
                booktabs = T,
-               caption = "W1 Conscientiousness on W4 (log) income") %>% 
-    row_spec(3, bold = T)
+               caption = "W1 Conscientiousness on W4 employment") 
 
 ```
 
 ## Model 2
+
+```{r Model 2, results='asis', echo=FALSE}
+tab2 <- read_rds("~/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/tab2.rds")
+
+tab2 %>% kable(format = "html",
+               booktabs = T,
+               caption = "W1 Conscientiousness on W4 (log) income") 
+
+```
 
 
 
