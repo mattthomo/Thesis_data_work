@@ -21,22 +21,30 @@ list.files('code/', full.names = T, recursive = T) %>% .[grepl('.R', .)] %>% as.
 ## Pull Data into R
 
 ```{r Pulling data into R}
-# pull W1 data from the adult questionnaires
-download.file(
-    'https://www.dropbox.com/scl/fi/3s45c3flubpx0ngbz4qjq/Adult_W1_Anon_V7.0.0.dta?rlkey=oa17mxoimb3gqdo7x7jh90elu&st=dpzn40ah&dl=1',
-    './data/w1_adult_anon.dta',
-    mode = "wb"
-)
+# Adult questionnaires
 
-w1 <- read_dta('./data/w1_adult_anon.dta')
+    # W1
+w1 <- read_dta('https://www.dropbox.com/scl/fi/3s45c3flubpx0ngbz4qjq/Adult_W1_Anon_V7.0.0.dta?rlkey=oa17mxoimb3gqdo7x7jh90elu&st=dpzn40ah&dl=1')
 
-# pull W4 data from adult questionnaires
-download.file(
-    'https://www.dropbox.com/scl/fi/3ggfkjhj55z09i11e40ft/Adult_W4_Anon_V2.0.0.dta?rlkey=wjrlq33ggrohe5o8z3mpjsrda&st=ul2l4ay9&dl=1',
-    './data/w4_adult_anon.dta'
-)
+    # W4
+w4 <- read_dta('https://www.dropbox.com/scl/fi/3ggfkjhj55z09i11e40ft/Adult_W4_Anon_V2.0.0.dta?rlkey=wjrlq33ggrohe5o8z3mpjsrda&st=ul2l4ay9&dl=1')
 
-w4 <- read_dta('./data/w4_adult_anon.dta')
+# Individual-derived data
+
+    # W1
+w1_best <- read_dta('https://www.dropbox.com/scl/fi/etluqr514bxyzigroy7cy/indderived_W1_Anon_V7.0.0.dta?rlkey=y79rxp6euqe82pj3tlo7y8xmh&st=pamh08ef&dl=1') 
+
+    # W4
+w4_best <- read_dta('https://www.dropbox.com/scl/fi/vkxbocpglujiix6fyd2m0/indderived_W4_Anon_V2.0.0.dta?rlkey=xwetrj2fmp75oozqh8bgo6xgz&st=0meb21px&dl=1')
+
+# HH questionnaires
+
+    # W1
+w1_hh_roster <- read_dta("https://www.dropbox.com/scl/fi/xlziinwu2txydwv2drcz6/HouseholdRoster_W1_Anon_V7.0.0.dta?rlkey=wku2iqdxbuibeibt0vuqpi3iq&st=58xqewm5&dl=1")
+
+w1_hh <- read_dta("https://www.dropbox.com/scl/fi/gnyzrt6ftftx7pn694501/HHQuestionnaire_W1_Anon_V7.0.0.dta?rlkey=xdbsbh790f0upvtztye0lmdzi&st=qw3bxzz4&dl=1")
+
+w1_child <- read_dta("https://www.dropbox.com/scl/fi/q28aia37wu3ijhv49we5m/Child_W1_Anon_V7.0.0.dta?rlkey=c8t4niecef95cep5z4hues34p&st=j104v6e6&dl=1")
 ```
 
 ## Clean and wrangle data
@@ -44,11 +52,17 @@ w4 <- read_dta('./data/w4_adult_anon.dta')
 -   Obtain W1 data and clean to include only variables which proxy for conscientiousness and other relevant variables
 
 ```{r Cleaning W1}
-clean_w1 <- w1 %>% 
-    select(pid, w1_a_dob_m, w1_a_dob_y, w1_a_gen, w1_a_unemmn, w1_a_hllfexer, w1_a_emohope, w1_a_aspen, w1_a_edter, w1_a_hllfsmk, w1_a_edintter, w1_a_wbsat, w1_a_hldifmon) %>% # selecting our questions which proxied for measures of conscientiousness
-    mutate(Age = 2008 - w1_a_dob_y) %>% # creating age variable 
-    filter(Age >= 14 & Age <=23) %>% # filter for those aged 14-23 at time of interview
-    select(-c(w1_a_dob_m, w1_a_dob_y)) # remove unnecessary data
+# first want to extract target group, those aged 14-23 in W1
+
+targetpop <- get_target_pop(df = w1_best, 
+                            lower_age = 14, 
+                            upper_age = 23)
+
+clean_w1 <- targetpop %>% 
+    left_join(w1 %>% 
+                 select(pid, w1_a_dob_m, w1_a_dob_y, w1_a_gen, w1_a_unemmn, w1_a_hllfexer, w1_a_emohope, w1_a_aspen, w1_a_edter, w1_a_hllfsmk,
+                        w1_a_edintter, w1_a_wbsat, w1_a_hldifmon), by = "pid") # selecting our questions which proxied for measures of conscientiousness
+    
 ```
 
 -   Now want to clean W4 data to obtain W4 wages, employment, and schooling
@@ -89,25 +103,14 @@ Test shows that data is not flawed!! :)
 
 ## Trying common sense test with best gender
 
-```{r Pull in different datasets}
-download.file(
-    'https://www.dropbox.com/scl/fi/etluqr514bxyzigroy7cy/indderived_W1_Anon_V7.0.0.dta?rlkey=y79rxp6euqe82pj3tlo7y8xmh&st=pamh08ef&dl=1',
-    './data/indderived_w1.dta',
-    mode = "wb"
-)
+```{r Common sense test2}
 
-w1_best <- read_dta('./data/indderived_w1.dta') # pull in data containing best gen variable in W1
 
 w1_best_gender <- w1_best %>%
     filter(w1_quest_typ == 1) %>% # only want those who did adult questionnaire
     select(pid, w1_best_gen)
 
-download.file(
-    'https://www.dropbox.com/scl/fi/vkxbocpglujiix6fyd2m0/indderived_W4_Anon_V2.0.0.dta?rlkey=xwetrj2fmp75oozqh8bgo6xgz&st=0meb21px&dl=1',
-    './data/indderived_w4.dta',
-    mode = "wb"
-)
-w4_best <- read_dta('./data/indderived_w4.dta') # pull in data containing best gen variable in W4
+
 
 w4_best_gender_empl <- w4_best %>%
     filter(w4_quest_typ == 1) %>% # only want those who did adult questionnaire
@@ -220,13 +223,12 @@ joined_w1_w4_best <- joined_w1_w4_best %>%
 
 joined_w1_w4_best$w1_a_consc <- pca_scores
 
+
+
 ```
 
 ```{r Make table for proposal, include=FALSE}
-# ols1 <- lm_robust(w4_employed ~ w1_a_consc + w4_best_gen + w4_best_race,
-#                   data = joined_w1_w4_best)
-# 
-# 
+ 
 # saveRDS(results_tbl, file = "./output/proposal_table1.rds")
 # 
 # 
@@ -282,30 +284,13 @@ Use MCA to construct a measure of wealth of individuals. This measure can then b
 
 ```{r Create wealth MCA}
 # pull variables into df which give us info on asset ownership
-clean_w1 <- clean_w1 %>%  
-    left_join(select(w1, pid, w1_a_ownrad, w1_a_ownvehpri, w1_a_ownmot, w1_a_owncom, w1_a_owncel), by = "pid") %>% 
-    nids_miss(c("w1_a_ownrad", "w1_a_ownvehpri", "w1_a_ownmot", "w1_a_owncom", "w1_a_owncel"))
-
-# testing to see if my mutate command worked to code any `2`, i.e. `No`, responses as 0 and leaving 1 = yes     
-test_mut <- clean_w1 %>% 
-    mutate(across(c("w1_a_ownrad", "w1_a_ownvehpri", "w1_a_ownmot", "w1_a_owncom", "w1_a_owncel"), ~ ifelse(.x == 2, 0, .x)))
-
-# Liam's MCA code
-# binary_matrix <-
-#   round7[, c("nrad","bradb","NOrad", "ntv","btvb","NOtv", "nveh","bvehb","NOveh", "ncom","bcomb", "NOcom", "npho", "bphob","NOpho",  "nban",     "bbanb", "NOban")]
-# #creating MCA
-# mca_result <- MCA(binary_matrix,graph = TRUE)
-# round7$assdex <-
-#   mca_result$ind$coord[, 1]
-# round7$assdex  <-
-#   (round7$assdex  + abs(min(round7$assdex)))# no negative
-# print(mca_result$var$coord[, 1])
-# remove(mca_result)
-# remove(binary_matrix)
-
-# Select the asset ownership columns
-asset_vars <- clean_w1 %>%
-  select(w1_a_ownrad, w1_a_ownvehpri, w1_a_ownmot, w1_a_owncom, w1_a_owncel)
+# clean_w1 <- clean_w1 %>%  
+#     left_join(select(w1, pid, w1_a_ownrad, w1_a_ownvehpri, w1_a_ownmot, w1_a_owncom, w1_a_owncel), by = "pid") %>% 
+#     nids_miss(c("w1_a_ownrad", "w1_a_ownvehpri", "w1_a_ownmot", "w1_a_owncom", "w1_a_owncel"))
+# 
+# # testing to see if my mutate command worked to code any `2`, i.e. `No`, responses as 0 and leaving 1 = yes     
+# test_mut <- clean_w1 %>% 
+#     mutate(across(c("w1_a_ownrad", "w1_a_ownvehpri", "w1_a_ownmot", "w1_a_owncom", "w1_a_owncel"), ~ ifelse(.x == 2, 0, .x)))
 
 ######Stopped here ##########
 # Select the asset ownership columns
@@ -326,6 +311,38 @@ asset_vars <- clean_w1 %>%
 # df <- df %>%
 #   mutate(asset_index = asset_index)
 
+
+wealth <- create_wealth_index(w1_best)
+
+wealth_age <- wealth %>% left_join(w1_best %>% select(pid, w1_best_age_yrs), by = "pid") %>% mutate(l_total_assets_pc = log(total_assets_pc))
+
+joined_w1_w4_best <- joined_w1_w4_best %>% 
+     left_join(wealth_age %>% select(pid, l_total_assets_pc), by = "pid")
+
+ols1 <- lm_robust(w4_employed ~ w1_a_consc + w4_best_gen + w4_best_race + l_total_assets_pc,
+                   data = joined_w1_w4_best)
+ summary(ols1) 
+
+ # create total income variable for W4
+ w4_best <- w4_best %>% mutate(total_inc = rowSums(.[, 17:42], na.rm = T))
+ 
+joined_w1_w4_best <- joined_w1_w4_best %>% 
+    left_join(w4_best %>% select(pid, total_inc), by = "pid")
+
+joined_w1_w4_best <- joined_w1_w4_best %>% 
+    mutate(l_total_inc = log(total_inc)) %>% 
+    mutate(l_total_inc = ifelse(l_total_inc == "-Inf", NA, l_total_inc)) %>% 
+    mutate(l_total_assets_pc = ifelse(l_total_assets_pc == "-Inf", NA, l_total_assets_pc)) %>% 
+    mutate(conscientiousness_shifted = w1_a_consc + if_else(min(w1_a_consc, na.rm = TRUE) < 0,
+                                                                  abs(min(w1_a_consc, na.rm = TRUE)),
+                                                                  0))
+
+
+ 
+ ols2 <- lm(l_total_inc ~ w1_a_consc + w4_best_gen + w4_best_race + l_total_assets_pc,
+                  data = joined_w1_w4_best)
+
+summary(ols2)
 ```
 
 
