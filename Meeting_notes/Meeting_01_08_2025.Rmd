@@ -15,7 +15,7 @@ pacman::p_load(kableExtra, tidyverse)
     - Using the parent id variables, I matched the monetary asset values of the parents to their children from our target group.
     - Code for this function found [here](https://github.com/mattthomo/Thesis_data_work/blob/main/code/create_wealth_index.R)
 - Got OLS estimates for a model with employment status (model 1) and log income (model 2) both from wave 4 as dependent variables.
-- 
+
 
 # Results
 
@@ -50,6 +50,9 @@ tab2 %>% kable(format = "html",
     - Had lots of observations dropped due to missing entries
     - Still go ahead with more complexed estimation techniques?
     - Go back and change specification of conscientiousness variable, or find source of missingness
+    - Additional controls: 
+        - age 
+        - educ
     - Simulations? (how to I'm not sure but sounded promising after yesterday's lecture)
 
 
