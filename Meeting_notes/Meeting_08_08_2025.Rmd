@@ -1,0 +1,43 @@
+---
+title: "Meeting 8 August 2025"
+author: "Matthew"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(kableExtra, tidyverse)
+```
+
+# Key points:
+
+- Added age, age$^2$, and age groups (14-15, 16-19, 20-23)
+- Added educ and educ$^2$
+
+   0                                         Grade R/0
+     1                             Grade 1/Sub A/Class 1
+     2                             Grade 2/Sub B/Class 2
+     3                                    Grade 3/Std. 1
+     4                                    Grade 4/Std. 2
+     5                                    Grade 5/Std. 3
+     6                                    Grade 6/Std. 4
+     7                                    Grade 7/Std. 5
+     8                             Grade 8/Std. 6/Form 1
+     9                             Grade 9/Std. 7/Form 2
+    10                            Grade 10/Std. 8/Form 3
+    11                            Grade 11/Std. 9/Form 4
+    12 Grade 12/Std. 10/Form 5/Matric/Senior Certificate
+    13                                             NTC 1
+    14                                             NTC 2
+    15                                             NTC 3
+    16       Certificate with less than Grade 12/Std. 10
+    17           Diploma with less than Grade 12/Std. 10
+    18                 Certificate with Grade 12/Std. 10
+    19                     Diploma with Grade 12/Std. 10
+    20                                  Bachelors degree
+    21                      Bachelors degree and Diploma
+    22                                    Honours degree
+    23                Higher degree (Masters, Doctorate)
+    24                                   Other (specify)
+    25                                      No Schooling
+    55                               No Higher Education

@@ -227,52 +227,6 @@ joined_w1_w4_best$w1_a_consc <- pca_scores
 
 ```
 
-```{r Make table for proposal, include=FALSE}
- 
-# saveRDS(results_tbl, file = "./output/proposal_table1.rds")
-# 
-# 
-# library(modelsummary)
-# library(kableExtra)
-# 
-# model_list <- ols1
-# # Generate kableExtra table directly
-# ols1_output <- modelsummary(
-#     list("Employed = 1" = ols1),
-#     stars = c('*' = .1, '**' = .05, '***' = .01),
-#     coef_map = c(
-#         "Intercept" = "Constant",
-#         "w1_a_consc" = "Conscientiousness",
-#         "w4_best_gen2" = "Female",
-#         "w4_best_race2" = "Coloured",
-#         "w4_best_race3" = "Asian/Indian",
-#         "w4_best_race4" = "White"),
-#     output = "kableExtra",
-#     notes = "Robust standard errors reported in parentheses",
-#     title = getOption("Preliminary OLS relationship between employment status and
-#           conscientiousness", default = NULL))
-# ols1_output
-# saveRDS(ols1_output, file = "./output/ols1_output.rds") 
-# 
-#     kable_styling(full_width = FALSE,
-#                               bootstrap_options = c("striped", "hover")) %>% 
-#     kable(format = "latex")
-# 
-# latex_table_clean <- gsub("\u2212", "-", ols1_output)
-# 
-# writeLines(latex_table_clean, "./output/ols1_output.md")
-# 
-# 
-# writeLines(ols1_output, "./output/ols1_output.md")
-# 
-# reg_table_renamed <- table1 %>%
-#   rename(
-#     Variable = term,
-#     OLS_Model_1 = `Model 1`,
-#     OLS_Model_2 = `Model 2`
-#   )
-```
-
 
 # Continue work on OLS
 
@@ -392,5 +346,45 @@ summary(ols2)
 ```
 
 
+# Revised OLS
 
+Want to include some revisions to the original models run to provide potentially better estimates.
+
+## Include age and educ in df
+
+```{r}
+# rename df to ols_df for ease of recalling
+
+# adding age information
+ols_df <- joined_w1_w4_best %>% 
+    left_join(w1_best %>% select(pid, w1_best_age_yrs),
+              by = "pid") %>% # add age column
+    mutate(age_sq = w1_best_age_yrs^2) %>%  # create age squared column
+    rename("w1_age" = "w1_best_age_yrs") %>% 
+    mutate(w1_age_groups = case_when(w1_age >=14 & w1_age <= 15 ~ "14-15",
+                                  w1_age >= 16 & w1_age <=19 ~ "16-19",
+                                  w1_age >= 20 ~ "20-23")) # create age groupings 
+
+# adding education information
+ols_df <- ols_df %>% 
+    left_join(w1_best %>% select(pid, w1_best_edu), 
+              by = "pid") %>% 
+    nids_miss("w1_best_edu") %>% # code missings as NA
+    mutate(w1_best_edu = ifelse(w1_best_edu == 24,
+                                NA,
+                                w1_best_edu)) %>%  # code those who reported "Other" for level of educ as missing
+    mutate(w1_best_edu = ifelse(w1_best_edu == 25,
+                                0,
+                                w1_best_edu + 1))
+
+```
+
+
+## Factor Analysis of Mixed Data
+
+First create df of only asset values and binary ownership columns
+
+```{r}
+
+```
 
