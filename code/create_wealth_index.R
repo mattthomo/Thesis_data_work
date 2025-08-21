@@ -83,26 +83,26 @@ create_wealth_index <- function(df){
         mutate(nr_of_parents = rowSums(!is.na(across(c("w1_best_mthpid", "w1_best_fthpid"))))) %>%
         mutate(nr_hh_memb = ifelse(is.na(w1_best_mthpid) & !is.na(w1_best_fthpid),
                                    nr_of_parents + 1,
-                                   nr_of_parents + w1_a_bhlive_n)) %>%  # this creates 920 missing variables due to missing values for nr of kids
+                                   nr_of_parents + w1_a_bhlive_n))   # this creates 920 missing variables due to missing values for nr of kids
 
     # bear with me as the following code all works to specify the nr of hh members of these 920 missings
 
 
-    # final_df <- asset_df %>%
-    #     mutate(total_assets = rowSums(across(c("total_rad", "total_vehpriv", "total_mot", "total_com", "total_cel")))) %>%
-    #     mutate(total_assets_pc = total_assets/nr_hh_memb)
+    final_df <- asset_df %>%
+        mutate(total_assets = rowSums(across(c("total_rad", "total_vehpriv", "total_mot", "total_com", "total_cel")))) %>%
+        mutate(total_assets_pc = total_assets/nr_hh_memb)
 
-    asset_df
+    final_df
 }
 
-join_test <- create_wealth_index(w1_best)
-
-join_test2 <- join_test %>%
-    filter(is.na(nr_hh_memb))
-
-join_test3 <- join_test2 %>%
-    mutate(parent_combo = paste(w1_best_mthpid, w1_best_fthpid, sep = "_")) %>%  # Combine parent IDs
-    group_by(parent_combo) %>%
-    mutate(n_siblings = n(),                            # total children with same parents
-           hh_members = nr_of_parents + n_siblings) %>%  # parents + siblings
-    ungroup()
+# join_test <- create_wealth_index(w1_best)
+#
+# join_test2 <- join_test %>%
+#     filter(is.na(nr_hh_memb))
+#
+# join_test3 <- join_test2 %>%
+#     mutate(parent_combo = paste(w1_best_mthpid, w1_best_fthpid, sep = "_")) %>%  # Combine parent IDs
+#     group_by(parent_combo) %>%
+#     mutate(n_siblings = n(),                            # total children with same parents
+#            hh_members = nr_of_parents + n_siblings) %>%  # parents + siblings
+#     ungroup()

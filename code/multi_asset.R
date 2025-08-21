@@ -110,4 +110,4 @@ multi_asset <- function(df){
     asset_df
 }
 
-test_df <- multi_asset(targetpop)
+#test_df <- multi_asset(targetpop)

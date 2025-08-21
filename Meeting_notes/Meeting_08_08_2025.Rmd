@@ -1,5 +1,5 @@
 ---
-title: "Meeting 8 August 2025"
+title: "Meeting 22 August 2025"
 author: "Matthew"
 output: github_document
 ---
@@ -13,31 +13,142 @@ pacman::p_load(kableExtra, tidyverse)
 
 - Added age, age$^2$, and age groups (14-15, 16-19, 20-23)
 - Added educ and educ$^2$
+- Constructed wealth index with FAMD, combining both monetary value of assets with binary ownership variable (results plotted below)
 
-   0                                         Grade R/0
-     1                             Grade 1/Sub A/Class 1
-     2                             Grade 2/Sub B/Class 2
-     3                                    Grade 3/Std. 1
-     4                                    Grade 4/Std. 2
-     5                                    Grade 5/Std. 3
-     6                                    Grade 6/Std. 4
-     7                                    Grade 7/Std. 5
-     8                             Grade 8/Std. 6/Form 1
-     9                             Grade 9/Std. 7/Form 2
-    10                            Grade 10/Std. 8/Form 3
-    11                            Grade 11/Std. 9/Form 4
-    12 Grade 12/Std. 10/Form 5/Matric/Senior Certificate
-    13                                             NTC 1
-    14                                             NTC 2
-    15                                             NTC 3
-    16       Certificate with less than Grade 12/Std. 10
-    17           Diploma with less than Grade 12/Std. 10
-    18                 Certificate with Grade 12/Std. 10
-    19                     Diploma with Grade 12/Std. 10
-    20                                  Bachelors degree
-    21                      Bachelors degree and Diploma
-    22                                    Honours degree
-    23                Higher degree (Masters, Doctorate)
-    24                                   Other (specify)
-    25                                      No Schooling
-    55                               No Higher Education
+
+# Wealth FAMD
+
+FAMD (Factor Analysis of Mixed Data) was used to construct the wealth index. This combined the binary asset ownership variable (categorical) and the monetary value of the asset owned (continuous). This was constructed from the parent's ownership information.
+
+```{r echo=FALSE, out.width='50%'}
+knitr::include_graphics('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/wealth_index_FAMD.png')
+```
+
+
+# Revised OLS Results
+
+## Simple models
+
+```{r Simple model 1, results='asis', echo=FALSE}
+simple_ols1 <- read_rds("~/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/simple_ols1.rds")
+
+simple_ols1 %>% kable(format = "html",
+               booktabs = T,
+               caption = "Simple Model: Education on Employment Status") 
+
+```
+
+```{r Simple model 2, results='asis', echo=FALSE}
+simple_ols2 <- read_rds("~/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/simple_ols2.rds")
+
+simple_ols2 %>% kable(format = "html",
+               booktabs = T,
+               caption = "Simple Model: Education on Log Income") 
+
+```
+
+## Adding controls of Educ Squared, Age and Age Squared
+
+```{r Control model 1, results='asis', echo=FALSE}
+control1 <- read_rds("~/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/control1.rds")
+
+control1 %>% kable(format = "html",
+               booktabs = T,
+               caption = "Dependent variable = Employment status") 
+
+```
+
+```{r Control model 2, results='asis', echo=FALSE}
+control2 <- read_rds("~/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/control2.rds")
+
+control2 %>% kable(format = "html",
+               booktabs = T,
+               caption = "Dependent variable = Log Income") 
+
+```
+
+
+## Add gender and race
+
+```{r Control model 3, results='asis', echo=FALSE}
+control3 <- read_rds("~/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/control3.rds")
+
+control3 %>% kable(format = "html",
+               booktabs = T,
+               caption = "Dependent variable: Employment Status") 
+
+```
+
+```{r Control model 4, results='asis', echo=FALSE}
+control4 <- read_rds("~/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/control4.rds")
+
+control4 %>% kable(format = "html",
+               booktabs = T,
+               caption = "Dependent variable: Log Income") 
+
+```
+
+## Add wealth
+
+```{r Control model 5, results='asis', echo=FALSE}
+control5 <- read_rds("~/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/control5.rds")
+
+control5 %>% kable(format = "html",
+               booktabs = T,
+               caption = "Dependent variable: Employment Status") 
+
+```
+
+```{r Control model 6, results='asis', echo=FALSE}
+control6 <- read_rds("~/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/control6.rds")
+
+control6 %>% kable(format = "html",
+               booktabs = T,
+               caption = "Dependent variable: Log Income") 
+
+```
+
+## Now add conscientiousness
+
+```{r Full model 1, results='asis', echo=FALSE}
+fullreg1 <- read_rds("~/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/fullreg1.rds")
+
+fullreg1 %>% kable(format = "html",
+               booktabs = T,
+               caption = "Dependent variable: Employment Status") 
+
+```
+
+```{r Full model 2, results='asis', echo=FALSE}
+fullreg2 <- read_rds("~/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/fullreg2.rds")
+
+fullreg2 %>% kable(format = "html",
+               booktabs = T,
+               caption = "Dependent variable: Log income") 
+
+```
+
+## Now provide full models using alternate specification of age
+
+```{r Full model 3, results='asis', echo=FALSE}
+fullreg3 <- read_rds("~/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/fullreg3.rds")
+
+fullreg3 %>% kable(format = "html",
+               booktabs = T,
+               caption = "Dependent variable: Employment status") 
+
+```
+
+
+```{r Full model 4, results='asis', echo=FALSE}
+fullreg4 <- read_rds("~/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/fullreg4.rds")
+
+fullreg4 %>% kable(format = "html",
+               booktabs = T,
+               caption = "Dependent variable: Log income") 
+
+```
+
+
+
+

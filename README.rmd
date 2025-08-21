@@ -375,7 +375,18 @@ ols_df <- ols_df %>%
                                 w1_best_edu)) %>%  # code those who reported "Other" for level of educ as missing
     mutate(w1_best_edu = ifelse(w1_best_edu == 25,
                                 0,
-                                w1_best_edu + 1))
+                                w1_best_edu + 1)) %>% 
+    left_join(w4_best %>% select(pid, w4_best_edu),
+              by = "pid") %>% 
+    nids_miss("w4_best_edu") %>% 
+    mutate(w4_best_edu = ifelse(w4_best_edu == 24,
+                                NA,
+                                w4_best_edu)) %>%  # code those who reported "Other" for level of educ as missing
+    mutate(w1_best_edu = ifelse(w4_best_edu == 25,
+                                0,
+                                w4_best_edu + 1)) %>% 
+    mutate(w1_educ_squared = w1_best_edu^2) %>% 
+    mutate(w4_educ_squared = w4_best_edu^2)
 
 ```
 
@@ -385,6 +396,137 @@ ols_df <- ols_df %>%
 First create df of only asset values and binary ownership columns
 
 ```{r}
+# add ownership columns of mom and dad to wealth df
 
+new_wealth <- wealth %>% 
+    mutate(radio_own = NA,
+           veh_own = NA,
+           mot_own = NA,
+           com_own = NA,
+           cell_own = NA) %>% 
+    # join mother's asset ownership details
+    left_join(w1 %>% 
+                  select(pid, w1_a_ownrad, w1_a_ownvehpri, w1_a_ownmot, w1_a_owncom, w1_a_owncel) %>% rename("w1_best_mthpid" = "pid"),
+              by = "w1_best_mthpid") %>% 
+    # now join father's asset ownership details
+    left_join(w1 %>% 
+                  select(pid, w1_a_ownrad, w1_a_ownvehpri, w1_a_ownmot, w1_a_owncom, w1_a_owncel) %>% 
+                  rename("w1_best_fthpid" = "pid",
+                         "rad_fath" = "w1_a_ownrad",
+                         "veh_fath" = "w1_a_ownvehpri",
+                         "mot_fath" = "w1_a_ownmot",
+                         "com_fath" = "w1_a_owncom", 
+                         "cel_fath" = "w1_a_owncel"),
+              by = "w1_best_fthpid") %>% 
+    # now code 1 if any of parents had a particular asset 
+    mutate(radio_own = case_when(w1_a_ownrad == 1 | rad_fath == 1 ~ 1,
+                                 TRUE ~ 0),
+           veh_own = case_when(w1_a_ownvehpri == 1 | veh_fath == 1 ~ 1,
+                                 TRUE ~ 0),
+           mot_own = case_when(w1_a_ownmot == 1 | mot_fath == 1 ~ 1,
+                                 TRUE ~ 0),
+           com_own = case_when(w1_a_owncom == 1 | com_fath == 1 ~ 1,
+                                 TRUE ~ 0),
+           cell_own = case_when(w1_a_owncel == 1 | cel_fath == 1 ~ 1,
+                                 TRUE ~ 0)
+           )
+
+asset_mca_df <- new_wealth %>% 
+    select(pid, total_rad, total_vehpriv, total_mot, total_com, total_cel, radio_own, veh_own, mot_own, com_own, cell_own) %>% 
+    # need to code binary variables as categorical for FAMD to work
+    mutate(radio_own = factor(radio_own, levels = c(0,1), labels = c("No", "Yes")),
+           veh_own = factor(veh_own, levels = c(0,1), labels = c("No", "Yes")),
+           mot_own = factor(mot_own, levels = c(0,1), labels = c("No", "Yes")),
+           com_own = factor(com_own, levels = c(0,1), labels = c("No", "Yes")),
+           cell_own = factor(cell_own, levels = c(0,1), labels = c("No", "Yes")))
+
+
+famd_res <- FAMD(asset_mca_df %>% select(total_rad, total_vehpriv, total_mot, total_com, total_cel, radio_own, veh_own, mot_own, com_own, cell_own), graph = T)
+
+famd_wealth_index <- famd_res$ind$coord[,1]
+
+famd_scores <- new_wealth %>% 
+    select(pid) %>% 
+    mutate(wealth_index_famd = famd_wealth_index)
+
+ols_df <- ols_df %>% 
+    left_join(famd_scores, by = "pid")
+
+```
+
+# Rerun OLS
+
+```{r}
+# Simple models
+
+simple_ols1 <- lm_robust(data = ols_df,
+                  w4_employed ~ w4_best_edu)
+
+make_simple_tables(simple_ols1, "./output/simple_ols1.rds")
+
+simple_ols2 <- lm(data = ols_df,
+                  l_total_inc ~ w4_best_edu)
+
+make_simple_tables(simple_ols2, "./output/simple_ols2.rds")
+
+# Adding controls of educ squared, age and age squared
+
+control1 <- lm_robust(data = ols_df,
+                      w4_employed ~ w4_best_edu + w4_educ_squared + w1_age + age_sq)
+
+make_simple_tables(control1, "./output/control1.rds")
+
+control2 <- lm(data = ols_df,
+               l_total_inc ~ w4_best_edu + w4_educ_squared + w1_age + age_sq)
+
+make_simple_tables(control2, "./output/control2.rds")
+
+# add gender and race
+control3 <- lm_robust(data = ols_df,
+                      w4_employed ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race)
+
+make_simple_tables(control3, "./output/control3.rds")
+
+control4 <- lm(data = ols_df,
+               l_total_inc ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race)
+
+make_simple_tables(control4, "./output/control4.rds")
+
+# add wealth
+
+control5 <- lm_robust(data = ols_df,
+                      w4_employed ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd)
+
+make_simple_tables(control5, "./output/control5.rds")
+
+control6 <- lm(data = ols_df,
+               l_total_inc ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd)
+
+make_simple_tables(control6, "./output/control6.rds")
+
+# now add conscientiousness measure
+
+full_reg1 <- lm_robust(data = ols_df,
+                      w4_employed ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd + w1_a_consc)
+
+make_simple_tables(full_reg1, "./output/fullreg1.rds")
+
+full_reg2 <- lm(data = ols_df,
+               l_total_inc ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd + w1_a_consc)
+
+make_simple_tables(full_reg2, "./output/fullreg2.rds")
+
+
+# give full model with alternate age specification
+
+full_reg3 <- lm_robust(data = ols_df,
+                       w4_employed ~ w4_best_edu + w4_educ_squared + as.factor(w1_age_groups) + w4_best_gen + w4_best_race + wealth_index_famd + w1_a_consc)
+
+make_simple_tables(full_reg3, "./output/fullreg3.rds")
+
+full_reg4 <- lm(data = ols_df,
+               l_total_inc ~ w4_best_edu + w4_educ_squared + as.factor(w1_age_groups) + w4_best_gen + w4_best_race + wealth_index_famd + w1_a_consc)
+
+make_simple_tables(full_reg4, "./output/fullreg4.rds")
 ```
 
