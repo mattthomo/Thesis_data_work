@@ -14,22 +14,30 @@ thesis for 2025.
 ## Pull Data into R
 
 ``` r
-# pull W1 data from the adult questionnaires
-download.file(
-    'https://www.dropbox.com/scl/fi/3s45c3flubpx0ngbz4qjq/Adult_W1_Anon_V7.0.0.dta?rlkey=oa17mxoimb3gqdo7x7jh90elu&st=dpzn40ah&dl=1',
-    './data/w1_adult_anon.dta',
-    mode = "wb"
-)
+# Adult questionnaires
 
-w1 <- read_dta('./data/w1_adult_anon.dta')
+    # W1
+w1 <- read_dta('https://www.dropbox.com/scl/fi/3s45c3flubpx0ngbz4qjq/Adult_W1_Anon_V7.0.0.dta?rlkey=oa17mxoimb3gqdo7x7jh90elu&st=dpzn40ah&dl=1')
 
-# pull W4 data from adult questionnaires
-download.file(
-    'https://www.dropbox.com/scl/fi/3ggfkjhj55z09i11e40ft/Adult_W4_Anon_V2.0.0.dta?rlkey=wjrlq33ggrohe5o8z3mpjsrda&st=ul2l4ay9&dl=1',
-    './data/w4_adult_anon.dta'
-)
+    # W4
+w4 <- read_dta('https://www.dropbox.com/scl/fi/3ggfkjhj55z09i11e40ft/Adult_W4_Anon_V2.0.0.dta?rlkey=wjrlq33ggrohe5o8z3mpjsrda&st=ul2l4ay9&dl=1')
 
-w4 <- read_dta('./data/w4_adult_anon.dta')
+# Individual-derived data
+
+    # W1
+w1_best <- read_dta('https://www.dropbox.com/scl/fi/etluqr514bxyzigroy7cy/indderived_W1_Anon_V7.0.0.dta?rlkey=y79rxp6euqe82pj3tlo7y8xmh&st=pamh08ef&dl=1') 
+
+    # W4
+w4_best <- read_dta('https://www.dropbox.com/scl/fi/vkxbocpglujiix6fyd2m0/indderived_W4_Anon_V2.0.0.dta?rlkey=xwetrj2fmp75oozqh8bgo6xgz&st=0meb21px&dl=1')
+
+# HH questionnaires
+
+    # W1
+w1_hh_roster <- read_dta("https://www.dropbox.com/scl/fi/xlziinwu2txydwv2drcz6/HouseholdRoster_W1_Anon_V7.0.0.dta?rlkey=wku2iqdxbuibeibt0vuqpi3iq&st=58xqewm5&dl=1")
+
+w1_hh <- read_dta("https://www.dropbox.com/scl/fi/gnyzrt6ftftx7pn694501/HHQuestionnaire_W1_Anon_V7.0.0.dta?rlkey=xdbsbh790f0upvtztye0lmdzi&st=qw3bxzz4&dl=1")
+
+w1_child <- read_dta("https://www.dropbox.com/scl/fi/q28aia37wu3ijhv49we5m/Child_W1_Anon_V7.0.0.dta?rlkey=c8t4niecef95cep5z4hues34p&st=j104v6e6&dl=1")
 ```
 
 ## Clean and wrangle data
@@ -38,11 +46,16 @@ w4 <- read_dta('./data/w4_adult_anon.dta')
   conscientiousness and other relevant variables
 
 ``` r
-clean_w1 <- w1 %>% 
-    select(pid, w1_a_dob_m, w1_a_dob_y, w1_a_gen, w1_a_unemmn, w1_a_hllfexer, w1_a_emohope, w1_a_aspen, w1_a_edter, w1_a_hllfsmk, w1_a_edintter, w1_a_wbsat, w1_a_hldifmon) %>% # selecting our questions which proxied for measures of conscientiousness
-    mutate(Age = 2008 - w1_a_dob_y) %>% # creating age variable 
-    filter(Age >= 14 & Age <=23) %>% # filter for those aged 14-23 at time of interview
-    select(-c(w1_a_dob_m, w1_a_dob_y)) # remove unnecessary data
+# first want to extract target group, those aged 14-23 in W1
+
+targetpop <- get_target_pop(df = w1_best, 
+                            lower_age = 14, 
+                            upper_age = 23)
+
+clean_w1 <- targetpop %>% 
+    left_join(w1 %>% 
+                 select(pid, w1_a_dob_m, w1_a_dob_y, w1_a_gen, w1_a_unemmn, w1_a_hllfexer, w1_a_emohope, w1_a_aspen, w1_a_edter, w1_a_hllfsmk,
+                        w1_a_edintter, w1_a_wbsat, w1_a_hldifmon), by = "pid") # selecting our questions which proxied for measures of conscientiousness
 ```
 
 - Now want to clean W4 data to obtain W4 wages, employment, and
@@ -94,24 +107,11 @@ the `best_gen` variable as this provides a better measure for test.
 ## Trying common sense test with best gender
 
 ``` r
-download.file(
-    'https://www.dropbox.com/scl/fi/etluqr514bxyzigroy7cy/indderived_W1_Anon_V7.0.0.dta?rlkey=y79rxp6euqe82pj3tlo7y8xmh&st=pamh08ef&dl=1',
-    './data/indderived_w1.dta',
-    mode = "wb"
-)
-
-w1_best <- read_dta('./data/indderived_w1.dta') # pull in data containing best gen variable in W1
-
 w1_best_gender <- w1_best %>%
     filter(w1_quest_typ == 1) %>% # only want those who did adult questionnaire
     select(pid, w1_best_gen)
 
-download.file(
-    'https://www.dropbox.com/scl/fi/vkxbocpglujiix6fyd2m0/indderived_W4_Anon_V2.0.0.dta?rlkey=xwetrj2fmp75oozqh8bgo6xgz&st=0meb21px&dl=1',
-    './data/indderived_w4.dta',
-    mode = "wb"
-)
-w4_best <- read_dta('./data/indderived_w4.dta') # pull in data containing best gen variable in W4
+
 
 w4_best_gender_empl <- w4_best %>%
     filter(w4_quest_typ == 1) %>% # only want those who did adult questionnaire
@@ -261,30 +261,13 @@ can then be used as a control in the model.
 
 ``` r
 # pull variables into df which give us info on asset ownership
-clean_w1 <- clean_w1 %>%  
-    left_join(select(w1, pid, w1_a_ownrad, w1_a_ownvehpri, w1_a_ownmot, w1_a_owncom, w1_a_owncel), by = "pid") %>% 
-    nids_miss(c("w1_a_ownrad", "w1_a_ownvehpri", "w1_a_ownmot", "w1_a_owncom", "w1_a_owncel"))
-
-# testing to see if my mutate command worked to code any `2`, i.e. `No`, responses as 0 and leaving 1 = yes     
-test_mut <- clean_w1 %>% 
-    mutate(across(c("w1_a_ownrad", "w1_a_ownvehpri", "w1_a_ownmot", "w1_a_owncom", "w1_a_owncel"), ~ ifelse(.x == 2, 0, .x)))
-
-# Liam's MCA code
-# binary_matrix <-
-#   round7[, c("nrad","bradb","NOrad", "ntv","btvb","NOtv", "nveh","bvehb","NOveh", "ncom","bcomb", "NOcom", "npho", "bphob","NOpho",  "nban",     "bbanb", "NOban")]
-# #creating MCA
-# mca_result <- MCA(binary_matrix,graph = TRUE)
-# round7$assdex <-
-#   mca_result$ind$coord[, 1]
-# round7$assdex  <-
-#   (round7$assdex  + abs(min(round7$assdex)))# no negative
-# print(mca_result$var$coord[, 1])
-# remove(mca_result)
-# remove(binary_matrix)
-
-# Select the asset ownership columns
-asset_vars <- clean_w1 %>%
-  select(w1_a_ownrad, w1_a_ownvehpri, w1_a_ownmot, w1_a_owncom, w1_a_owncel)
+# clean_w1 <- clean_w1 %>%  
+#     left_join(select(w1, pid, w1_a_ownrad, w1_a_ownvehpri, w1_a_ownmot, w1_a_owncom, w1_a_owncel), by = "pid") %>% 
+#     nids_miss(c("w1_a_ownrad", "w1_a_ownvehpri", "w1_a_ownmot", "w1_a_owncom", "w1_a_owncel"))
+# 
+# # testing to see if my mutate command worked to code any `2`, i.e. `No`, responses as 0 and leaving 1 = yes     
+# test_mut <- clean_w1 %>% 
+#     mutate(across(c("w1_a_ownrad", "w1_a_ownvehpri", "w1_a_ownmot", "w1_a_owncom", "w1_a_owncel"), ~ ifelse(.x == 2, 0, .x)))
 
 ######Stopped here ##########
 # Select the asset ownership columns
@@ -304,4 +287,332 @@ asset_vars <- clean_w1 %>%
 # # Add the asset index as a new column to your original dataframe
 # df <- df %>%
 #   mutate(asset_index = asset_index)
+
+
+wealth <- create_wealth_index(w1_best)
+
+wealth_age <- wealth %>% left_join(w1_best %>% select(pid, w1_best_age_yrs), by = "pid") %>% mutate(l_total_assets_pc = log(total_assets_pc))
+
+joined_w1_w4_best <- joined_w1_w4_best %>% 
+     left_join(wealth_age %>% select(pid, l_total_assets_pc), by = "pid")
+
+ols1 <- lm_robust(w4_employed ~ w1_a_consc 
+                  + w4_best_gen + w4_best_race + l_total_assets_pc,
+                   data = joined_w1_w4_best)
+ summary(ols1) 
+```
+
+    ## 7 coefficients  not defined because the design matrix is rank deficient
+
+    ## 
+    ## Call:
+    ## lm_robust(formula = w4_employed ~ w1_a_consc + w4_best_gen + 
+    ##     w4_best_race + l_total_assets_pc, data = joined_w1_w4_best)
+    ## 
+    ## Standard error type:  HC2 
+    ## 
+    ## Coefficients: (7 not defined because the design matrix is rank deficient)
+    ##                   Estimate Std. Error t value Pr(>|t|) CI Lower CI Upper DF
+    ## (Intercept)             NA         NA      NA       NA       NA       NA NA
+    ## w1_a_consc              NA         NA      NA       NA       NA       NA NA
+    ## w4_best_gen2            NA         NA      NA       NA       NA       NA NA
+    ## w4_best_race2           NA         NA      NA       NA       NA       NA NA
+    ## w4_best_race3           NA         NA      NA       NA       NA       NA NA
+    ## w4_best_race4           NA         NA      NA       NA       NA       NA NA
+    ## l_total_assets_pc       NA         NA      NA       NA       NA       NA NA
+    ## 
+    ## Multiple R-squared:  -0.9075 ,   Adjusted R-squared:  -0.9065
+
+``` r
+# Create a tibble with estimates, p-values, and significance stars
+
+table_1 <- tidy(ols1) %>%
+  filter(!is.na(estimate)) %>%  # remove dropped coefficients
+  mutate(
+    stars = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      p.value < 0.1   ~ ".",
+      TRUE            ~ ""
+    ),
+    estimate = round(estimate, 3),
+    estimate = paste0(estimate, stars),
+    std.error = round(std.error, 3),
+    p.value = signif(p.value, 3),
+    std.error = paste0("(", std.error, ")")
+  ) %>%
+  select(term, estimate, std.error, p.value) 
+```
+
+    ## 7 coefficients  not defined because the design matrix is rank deficient
+
+``` r
+write_rds(table_1, "./output/tab1.rds")
+
+
+ 
+ # create total income variable for W4
+ w4_best <- w4_best %>% mutate(total_inc = rowSums(.[, 17:42], na.rm = T))
+ 
+joined_w1_w4_best <- joined_w1_w4_best %>% 
+    left_join(w4_best %>% select(pid, total_inc), by = "pid")
+
+joined_w1_w4_best <- joined_w1_w4_best %>% 
+    mutate(l_total_inc = log(total_inc)) %>% 
+    mutate(l_total_inc = ifelse(l_total_inc == "-Inf", NA, l_total_inc)) %>% 
+    mutate(l_total_assets_pc = ifelse(l_total_assets_pc == "-Inf", NA, l_total_assets_pc)) %>% 
+    mutate(conscientiousness_shifted = w1_a_consc + if_else(min(w1_a_consc, na.rm = TRUE) < 0,
+                                                                  abs(min(w1_a_consc, na.rm = TRUE)),
+                                                                  0))
+
+
+ 
+ ols2 <- lm(l_total_inc ~ w1_a_consc + w4_best_gen + w4_best_race + l_total_assets_pc,
+                  data = joined_w1_w4_best)
+
+ table_2 <- tidy(ols2) %>%
+  filter(!is.na(estimate)) %>%  # remove dropped coefficients
+  mutate(
+    stars = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      p.value < 0.1   ~ ".",
+      TRUE            ~ ""
+    ),
+    estimate = round(estimate, 3),
+    estimate = paste0(estimate, stars),
+    std.error = round(std.error, 3),
+    p.value = signif(p.value, 3),
+    std.error = paste0("(", std.error, ")")
+  ) %>%
+  select(term, estimate, std.error, p.value) 
+ 
+ write_rds(table_2, "./output/tab2.rds")
+ 
+summary(ols2)
+```
+
+    ## 
+    ## Call:
+    ## lm(formula = l_total_inc ~ w1_a_consc + w4_best_gen + w4_best_race + 
+    ##     l_total_assets_pc, data = joined_w1_w4_best)
+    ## 
+    ## Residuals:
+    ##     Min      1Q  Median      3Q     Max 
+    ## -5.3843 -0.7180  0.1084  0.7499  4.7144 
+    ## 
+    ## Coefficients:
+    ##                   Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)        7.27459    0.12596  57.753  < 2e-16 ***
+    ## w1_a_consc        -0.07529    0.03606  -2.088 0.037088 *  
+    ## w4_best_gen2      -0.56513    0.07801  -7.244 9.66e-13 ***
+    ## w4_best_race2      0.01082    0.10655   0.102 0.919174    
+    ## w4_best_race3      1.20691    0.34636   3.485 0.000518 ***
+    ## w4_best_race4      0.54253    0.34105   1.591 0.112030    
+    ## l_total_assets_pc  0.09330    0.02189   4.262 2.25e-05 ***
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 1.079 on 863 degrees of freedom
+    ##   (4997 observations deleted due to missingness)
+    ## Multiple R-squared:  0.1256, Adjusted R-squared:  0.1195 
+    ## F-statistic: 20.65 on 6 and 863 DF,  p-value: < 2.2e-16
+
+# Revised OLS
+
+Want to include some revisions to the original models run to provide
+potentially better estimates.
+
+## Include age and educ in df
+
+``` r
+# rename df to ols_df for ease of recalling
+
+# adding age information
+ols_df <- joined_w1_w4_best %>% 
+    left_join(w1_best %>% select(pid, w1_best_age_yrs),
+              by = "pid") %>% # add age column
+    mutate(age_sq = w1_best_age_yrs^2) %>%  # create age squared column
+    rename("w1_age" = "w1_best_age_yrs") %>% 
+    mutate(w1_age_groups = case_when(w1_age >=14 & w1_age <= 15 ~ "14-15",
+                                  w1_age >= 16 & w1_age <=19 ~ "16-19",
+                                  w1_age >= 20 ~ "20-23")) # create age groupings 
+
+# adding education information
+ols_df <- ols_df %>% 
+    left_join(w1_best %>% select(pid, w1_best_edu), 
+              by = "pid") %>% 
+    nids_miss("w1_best_edu") %>% # code missings as NA
+    mutate(w1_best_edu = ifelse(w1_best_edu == 24,
+                                NA,
+                                w1_best_edu)) %>%  # code those who reported "Other" for level of educ as missing
+    mutate(w1_best_edu = ifelse(w1_best_edu == 25,
+                                0,
+                                w1_best_edu + 1)) %>% 
+    left_join(w4_best %>% select(pid, w4_best_edu),
+              by = "pid") %>% 
+    nids_miss("w4_best_edu") %>% 
+    mutate(w4_best_edu = ifelse(w4_best_edu == 24,
+                                NA,
+                                w4_best_edu)) %>%  # code those who reported "Other" for level of educ as missing
+    mutate(w1_best_edu = ifelse(w4_best_edu == 25,
+                                0,
+                                w4_best_edu + 1)) %>% 
+    mutate(w1_educ_squared = w1_best_edu^2) %>% 
+    mutate(w4_educ_squared = w4_best_edu^2)
+```
+
+## Factor Analysis of Mixed Data
+
+First create df of only asset values and binary ownership columns
+
+``` r
+# add ownership columns of mom and dad to wealth df
+
+new_wealth <- wealth %>% 
+    mutate(radio_own = NA,
+           veh_own = NA,
+           mot_own = NA,
+           com_own = NA,
+           cell_own = NA) %>% 
+    # join mother's asset ownership details
+    left_join(w1 %>% 
+                  select(pid, w1_a_ownrad, w1_a_ownvehpri, w1_a_ownmot, w1_a_owncom, w1_a_owncel) %>% rename("w1_best_mthpid" = "pid"),
+              by = "w1_best_mthpid") %>% 
+    # now join father's asset ownership details
+    left_join(w1 %>% 
+                  select(pid, w1_a_ownrad, w1_a_ownvehpri, w1_a_ownmot, w1_a_owncom, w1_a_owncel) %>% 
+                  rename("w1_best_fthpid" = "pid",
+                         "rad_fath" = "w1_a_ownrad",
+                         "veh_fath" = "w1_a_ownvehpri",
+                         "mot_fath" = "w1_a_ownmot",
+                         "com_fath" = "w1_a_owncom", 
+                         "cel_fath" = "w1_a_owncel"),
+              by = "w1_best_fthpid") %>% 
+    # now code 1 if any of parents had a particular asset 
+    mutate(radio_own = case_when(w1_a_ownrad == 1 | rad_fath == 1 ~ 1,
+                                 TRUE ~ 0),
+           veh_own = case_when(w1_a_ownvehpri == 1 | veh_fath == 1 ~ 1,
+                                 TRUE ~ 0),
+           mot_own = case_when(w1_a_ownmot == 1 | mot_fath == 1 ~ 1,
+                                 TRUE ~ 0),
+           com_own = case_when(w1_a_owncom == 1 | com_fath == 1 ~ 1,
+                                 TRUE ~ 0),
+           cell_own = case_when(w1_a_owncel == 1 | cel_fath == 1 ~ 1,
+                                 TRUE ~ 0)
+           )
+
+asset_mca_df <- new_wealth %>% 
+    select(pid, total_rad, total_vehpriv, total_mot, total_com, total_cel, radio_own, veh_own, mot_own, com_own, cell_own) %>% 
+    # need to code binary variables as categorical for FAMD to work
+    mutate(radio_own = factor(radio_own, levels = c(0,1), labels = c("No", "Yes")),
+           veh_own = factor(veh_own, levels = c(0,1), labels = c("No", "Yes")),
+           mot_own = factor(mot_own, levels = c(0,1), labels = c("No", "Yes")),
+           com_own = factor(com_own, levels = c(0,1), labels = c("No", "Yes")),
+           cell_own = factor(cell_own, levels = c(0,1), labels = c("No", "Yes")))
+
+
+famd_res <- FAMD(asset_mca_df %>% select(total_rad, total_vehpriv, total_mot, total_com, total_cel, radio_own, veh_own, mot_own, com_own, cell_own), graph = T)
+```
+
+    ## Warning: ggrepel: 4287 unlabeled data points (too many overlaps). Consider
+    ## increasing max.overlaps
+
+    ## Warning: ggrepel: 7 unlabeled data points (too many overlaps). Consider
+    ## increasing max.overlaps
+
+![](README_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+
+    ## Warning: ggrepel: 4287 unlabeled data points (too many overlaps). Consider
+    ## increasing max.overlaps
+
+![](README_files/figure-gfm/unnamed-chunk-2-2.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-2-3.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-2-4.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-2-5.png)<!-- -->
+
+``` r
+famd_wealth_index <- famd_res$ind$coord[,1]
+
+famd_scores <- new_wealth %>% 
+    select(pid) %>% 
+    mutate(wealth_index_famd = famd_wealth_index)
+
+ols_df <- ols_df %>% 
+    left_join(famd_scores, by = "pid")
+```
+
+# Rerun OLS
+
+``` r
+# Simple models
+
+simple_ols1 <- lm_robust(data = ols_df,
+                  w4_employed ~ w4_best_edu)
+
+make_simple_tables(simple_ols1, "./output/simple_ols1.rds")
+
+simple_ols2 <- lm(data = ols_df,
+                  l_total_inc ~ w4_best_edu)
+
+make_simple_tables(simple_ols2, "./output/simple_ols2.rds")
+
+# Adding controls of educ squared, age and age squared
+
+control1 <- lm_robust(data = ols_df,
+                      w4_employed ~ w4_best_edu + w4_educ_squared + w1_age + age_sq)
+
+make_simple_tables(control1, "./output/control1.rds")
+
+control2 <- lm(data = ols_df,
+               l_total_inc ~ w4_best_edu + w4_educ_squared + w1_age + age_sq)
+
+make_simple_tables(control2, "./output/control2.rds")
+
+# add gender and race
+control3 <- lm_robust(data = ols_df,
+                      w4_employed ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race)
+
+make_simple_tables(control3, "./output/control3.rds")
+
+control4 <- lm(data = ols_df,
+               l_total_inc ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race)
+
+make_simple_tables(control4, "./output/control4.rds")
+
+# add wealth
+
+control5 <- lm_robust(data = ols_df,
+                      w4_employed ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd)
+
+make_simple_tables(control5, "./output/control5.rds")
+
+control6 <- lm(data = ols_df,
+               l_total_inc ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd)
+
+make_simple_tables(control6, "./output/control6.rds")
+
+# now add conscientiousness measure
+
+full_reg1 <- lm_robust(data = ols_df,
+                      w4_employed ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd + w1_a_consc)
+
+make_simple_tables(full_reg1, "./output/fullreg1.rds")
+
+full_reg2 <- lm(data = ols_df,
+               l_total_inc ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd + w1_a_consc)
+
+make_simple_tables(full_reg2, "./output/fullreg2.rds")
+
+
+# give full model with alternate age specification
+
+full_reg3 <- lm_robust(data = ols_df,
+                       w4_employed ~ w4_best_edu + w4_educ_squared + as.factor(w1_age_groups) + w4_best_gen + w4_best_race + wealth_index_famd + w1_a_consc)
+
+make_simple_tables(full_reg3, "./output/fullreg3.rds")
+
+full_reg4 <- lm(data = ols_df,
+               l_total_inc ~ w4_best_edu + w4_educ_squared + as.factor(w1_age_groups) + w4_best_gen + w4_best_race + wealth_index_famd + w1_a_consc)
+
+make_simple_tables(full_reg4, "./output/fullreg4.rds")
 ```
