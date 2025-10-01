@@ -1,0 +1,22 @@
+---
+title: "Meeting_03_10_2025"
+author: "Matthew"
+output: github_document
+---
+
+# Purpose
+
+This document summarises the empirical methods employed in Heckman (2006)
+
+# Structural modelling of Heckman (2006)
+
+Notes taken from __Section VI (Implementing the Model)__ of Heckman paper:
+
+- Use Bayesian Markov chain Monte Carlo methods to compute sample likelihood
+- 
+- Wage equations at age 30 estimated for individuals at each final schooling level
+- Dummies included:
+    - Race
+    - Cohort (Age/Year of birth)
+    - Local labour market conditions (check Cameron and Heckman (2001) for list of variables used)
+    - Region of residence
