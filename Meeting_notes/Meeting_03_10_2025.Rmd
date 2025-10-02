@@ -13,7 +13,13 @@ This document summarises the empirical methods employed in Heckman (2006)
 Notes taken from __Section VI (Implementing the Model)__ of Heckman paper:
 
 - Use Bayesian Markov chain Monte Carlo methods to compute sample likelihood
-- 
+- "analysis in Carneiro (2003), Hansen (2004) and Heckman and Navarro (2006) establishes conditions on the support of the regressors that allow for semiparametric identification of the model"
+- "for the support conditions for semiparametric identification to hold, the support of the distribution for each probability should be the unit interval [0,1]"
+
+```{r echo=FALSE, out.width='50%'}
+knitr::include_graphics('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/Image 2025-10-02 at 18.09.jpeg')
+```
+
 - Wage equations at age 30 estimated for individuals at each final schooling level
 - Dummies included:
     - Race
