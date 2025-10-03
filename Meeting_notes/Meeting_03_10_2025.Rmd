@@ -10,6 +10,8 @@ This document summarises the empirical methods employed in Heckman (2006)
 
 # Structural modelling of Heckman (2006)
 
+[Here is the web appendix to the original Heckman paper](https://jenni.uchicago.edu/noncog/web_supplement.pdf)
+
 Notes taken from __Section VI (Implementing the Model)__ of Heckman paper:
 
 - Use Bayesian Markov chain Monte Carlo methods to compute sample likelihood
@@ -17,7 +19,7 @@ Notes taken from __Section VI (Implementing the Model)__ of Heckman paper:
 - "for the support conditions for semiparametric identification to hold, the support of the distribution for each probability should be the unit interval [0,1]"
 
 ```{r echo=FALSE, out.width='50%'}
-knitr::include_graphics('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/Image 2025-10-02 at 18.09.jpeg')
+knitr::include_graphics('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/Image 2025-10-02 at 18.51.jpeg')
 ```
 
 - Wage equations at age 30 estimated for individuals at each final schooling level
@@ -26,3 +28,6 @@ knitr::include_graphics('/Users/matthewthompson/Documents/Stellenbosch Universit
     - Cohort (Age/Year of birth)
     - Local labour market conditions (check Cameron and Heckman (2001) for list of variables used)
     - Region of residence
+- Multivariate probit model used
+
+
