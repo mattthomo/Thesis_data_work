@@ -25,6 +25,7 @@ Notes taken from __Section VI (Implementing the Model)__ of Heckman paper:
     - Work experience
     - Fertility choice
 - Multinomial probit model used for educational choice model
+    - Use schooling levels which are represented by simulations of schooling at age 30
 - Wage equations at age 30 estimated for individuals at each final schooling level
 - Dummies included:
     - Race
@@ -34,11 +35,12 @@ Notes taken from __Section VI (Implementing the Model)__ of Heckman paper:
 - Distributions of the unobservables identified nonparametrically
 
 - Last figures in the paper are generated from data from simulations of estimates from models and sample data
+
     
 _Things that confused me_:
 
 - footnote 16:
-    - "analysis in Carneiro (2003), Hansen (2004) and Heckman and Navarro (2006) establishes conditions on the support of the regressors that allow for semiparametric identification of the model"
+    - "analysis in Carneiro (2003), Hansen (2004), and Heckman and Navarro (2006) establishes conditions on the support of the regressors that allow for semiparametric identification of the model"
     - "for the support conditions for semiparametric identification to hold, the support of the distribution for each probability should be the unit interval [0,1]"
     
     ```{r echo=FALSE, out.width='50%'}
