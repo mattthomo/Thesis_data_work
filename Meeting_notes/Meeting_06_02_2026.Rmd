@@ -79,9 +79,10 @@ output: github_document
 
 # Steps:
 
-1. Specify latent factor model
+1. Define latent factor 
 
 $$ NonCog = conscientiousness $$
+(NonCog in accordance with Heckman paper)
 
 2. Specify structural model: wage depends on latent factor with other observables
 
@@ -91,7 +92,7 @@ $$ NonCog = conscientiousness $$
 
 $$ log(wage) = NonCog + education + age + etc.$$
 
-3. Estimate structural model (Heckman used Bayesian MCMC)
+3. Estimate structural model (Heckman used Bayesian MCMC simulation)
 
 4. Extract factor scores
 
