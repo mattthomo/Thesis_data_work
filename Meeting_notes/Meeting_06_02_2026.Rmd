@@ -77,7 +77,7 @@ output: github_document
 ```
 
 
-# Steps:
+# Structural modelling steps:
 
 1. Define latent factor 
 
