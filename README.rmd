@@ -9,7 +9,7 @@ This README captures all my code which I had used in the creation of my thesis f
 
 rm(list = ls()) # Clean your environment:
 gc() # garbage collection - It can be useful to call gc after a large object has been removed, as this may prompt R to return memory to the operating system.
-pacman::p_load(tidyverse, foreign, haven, estimatr, broom, kableExtra, FactoMineR)
+pacman::p_load(tidyverse, foreign, haven, estimatr, broom, kableExtra, FactoMineR, pcaMethods, missMDA)
 list.files('code/', full.names = T, recursive = T) %>% .[grepl('.R', .)] %>% as.list() %>% walk(~source(.))
 ```
 
@@ -62,7 +62,6 @@ clean_w1 <- targetpop %>%
     left_join(w1 %>% 
                  select(pid, w1_a_dob_m, w1_a_dob_y, w1_a_gen, w1_a_unemmn, w1_a_hllfexer, w1_a_emohope, w1_a_aspen, w1_a_edter, w1_a_hllfsmk,
                         w1_a_edintter, w1_a_wbsat, w1_a_hldifmon), by = "pid") # selecting our questions which proxied for measures of conscientiousness
-    
 ```
 
 -   Now want to clean W4 data to obtain W4 wages, employment, and schooling
@@ -95,6 +94,8 @@ test1 <- joined_w1_w4 %>%
     mutate(match = w1_a_gen == w4_a_gen) # returns TRUE/FALSE from logical test to see if the genders in W1 and W4 match for each observation
 
 unique(test1$match) # checking if we have only TRUE values
+
+rm(test1)
 ```
 
 Test shows that data is not flawed!! :)
@@ -134,6 +135,8 @@ test_best <- joined_w1_w4_best %>%
     mutate(match = w1_best_gen == w4_best_gen) # returns TRUE/FALSE from logical test to see if the genders in W1 and W4 match for each observation
 
 unique(test_best$match)
+
+rm(test_best)
 ```
 
 (WITH BEST GENDER VARIABLE) Now have 3 768 entries which were successfully joined. Once again the genders match. Now have only *380* missing observations for gender as opposed to *1 071*. W1 had no missing values reported for best gender, whereas *W4 had all the 380 missing values*. This might be explained by attrition post-W1.
@@ -166,13 +169,20 @@ Now can create dummy variable coding missing values as 1 and valid entries as 0.
 
 ```{r Conscientiousness dummies}
 # start by only selecting variables which we have narrowed study down to
+
 clean_w1 <- clean_w1 %>% 
     select(pid, w1_a_hllfexer, w1_a_emohope, w1_a_edter, w1_a_edintter, w1_a_hllfsmk, w1_a_wbsat, w1_a_hldifmon) %>% 
+    
     # create conscientiousness dummy
+    
     consc_dummy(c("w1_a_hllfexer", "w1_a_emohope", "w1_a_edter", "w1_a_edintter", "w1_a_hllfsmk", "w1_a_wbsat", "w1_a_hldifmon")) %>% 
+    
     # now want to make sure that all these values get coded as missing in original columns
-    nids_miss(c("w1_a_hllfexer", "w1_a_emohope", "w1_a_edter", "w1_a_edintter", "w1_a_hllfsmk", "w1_a_wbsat", "w1_a_hldifmon"))%>% 
+    
+    nids_miss(c("w1_a_hllfexer", "w1_a_emohope", "w1_a_edter", "w1_a_edintter", "w1_a_hllfsmk", "w1_a_wbsat", "w1_a_hldifmon")) %>%
+    
     #also need to make sure that all variables are increasing in conscientiousness in same direction
+    
     mutate(w1_a_edter_flipped = 3 - w1_a_edter)
 ```
 
@@ -207,6 +217,39 @@ pca_scores[complete_rows] <- consc$x[, 1]
 
 # Now assign back to original dataframe
 clean_w1$w1_a_consc <- pca_scores
+
+# TRY DIFFERENT METHOD
+new_pca_data <- clean_w1 %>% 
+    select(w1_a_hllfexer, w1_a_emohope, w1_a_edter_flipped, w1_a_hllfsmk)
+
+estim_comp <- estim_ncpPCA(new_pca_data) # estimate nr of components for imputation
+
+imputed_data <- imputePCA(new_pca_data,
+                          ncp = estim_comp$ncp) # impute missing values in df
+
+pca_results <- prcomp(imputed_data$completeObs, scale. = T)
+
+pca_scores2 <- pca_results$x
+
+clean_w1$consc_imput <- pca_scores2[,1]
+
+# This next code helps to explain what values of conscientiousness mean
+# Negative signs in each means that lower scores of these variables translates to higher PCs. This warrants flipping the sign of the measure for more easier interpretation
+
+
+pca_table <- as.data.frame(pca_results$rotation[,1]) %>% 
+    rownames_to_column("variable") %>%
+    rename("PC1" = 2) %>% 
+    mutate(
+        variable = case_when(
+            str_detect(variable, "w1_a_hllfex") ~ "Exercise",
+            str_detect(variable, "w1_a_emohope") ~ "Emotional hope",
+            str_detect(variable, "w1_a_edter") ~ "Planning tertiary education",
+            str_detect(variable, "w1_a_hllfsmk") ~ "Smoked",
+            TRUE ~ variable),
+        PC1 = sprintf("%.3f", PC1))
+
+write_rds(pca_table, "./output/pca_app.rds")
 ```
 
 # Run preliminary OLS for proposal
@@ -218,17 +261,13 @@ This section runs preliminary OLS models for inclusion into my research proposal
 joined_w1_w4_best <- joined_w1_w4_best %>%
     mutate(w4_empl_stat = ifelse(w4_empl_stat == -8, NA, w4_empl_stat)) %>%  # code those who refused to answer as missing (15 people)
     mutate(w4_employed = ifelse(w4_empl_stat == 3, 1, 0)) %>% 
-    mutate(w4_best_gen = as.factor(w4_best_gen)) %>%  # coding gender as a categorical variable
-    mutate(w4_best_race = as.factor(w4_best_race)) # coding race as a categorical variable
+    mutate(w4_best_gen = as_factor(w4_best_gen)) %>%  # coding gender as a categorical variable
+  mutate(w4_best_race = as_factor(w4_best_race)) # coding race as a categorical variable
 
 joined_w1_w4_best$w1_a_consc <- pca_scores
-
-
-
+joined_w1_w4_best$w1_consc_imput <- clean_w1$consc_imput
 ```
 
-
-# Continue work on OLS
 
 The following chunks are my post-proposal code and serve to continue the work to getting to an OLS model with additional controls.
 
@@ -273,11 +312,32 @@ wealth_age <- wealth %>% left_join(w1_best %>% select(pid, w1_best_age_yrs), by 
 joined_w1_w4_best <- joined_w1_w4_best %>% 
      left_join(wealth_age %>% select(pid, l_total_assets_pc), by = "pid")
 
-ols1 <- lm_robust(w4_employed ~ w1_a_consc 
-                  + w4_best_gen + w4_best_race + l_total_assets_pc,
-                   data = joined_w1_w4_best)
- summary(ols1) 
+ # create total income variable for W4
+ w4_best <- w4_best %>% mutate(total_inc = rowSums(.[, 17:42], na.rm = T))
+ 
+joined_w1_w4_best <- joined_w1_w4_best %>% 
+    left_join(w4_best %>% select(pid, total_inc), by = "pid")
 
+joined_w1_w4_best <- joined_w1_w4_best %>% 
+    mutate(l_total_inc = log(total_inc)) %>% 
+    mutate(l_total_inc = ifelse(l_total_inc == "-Inf", NA, l_total_inc)) %>% 
+    mutate(l_total_assets_pc = ifelse(l_total_assets_pc == "-Inf", NA, l_total_assets_pc)) %>% 
+    mutate(conscientiousness_shifted = w1_a_consc + if_else(min(w1_a_consc, na.rm = TRUE) < 0,
+                                                                  abs(min(w1_a_consc, na.rm = TRUE)),
+                                                                  0))
+
+
+ols1 <- lm_robust(w4_employed ~ w1_a_consc 
+                  + as.factor(w4_best_gen) + as.factor(w4_best_race) + l_total_assets_pc,
+                   data = joined_w1_w4_best)
+
+ols1impute <- lm_robust(w4_employed ~ w1_consc_imput 
+                  + as.factor(w4_best_gen) + as.factor(w4_best_race) + l_total_assets_pc,
+                   data = joined_w1_w4_best)
+
+
+quick_print(ols1)
+quick_print(ols1impute)
 
 # Create a tibble with estimates, p-values, and significance stars
 
@@ -303,19 +363,7 @@ write_rds(table_1, "./output/tab1.rds")
 
 
  
- # create total income variable for W4
- w4_best <- w4_best %>% mutate(total_inc = rowSums(.[, 17:42], na.rm = T))
- 
-joined_w1_w4_best <- joined_w1_w4_best %>% 
-    left_join(w4_best %>% select(pid, total_inc), by = "pid")
 
-joined_w1_w4_best <- joined_w1_w4_best %>% 
-    mutate(l_total_inc = log(total_inc)) %>% 
-    mutate(l_total_inc = ifelse(l_total_inc == "-Inf", NA, l_total_inc)) %>% 
-    mutate(l_total_assets_pc = ifelse(l_total_assets_pc == "-Inf", NA, l_total_assets_pc)) %>% 
-    mutate(conscientiousness_shifted = w1_a_consc + if_else(min(w1_a_consc, na.rm = TRUE) < 0,
-                                                                  abs(min(w1_a_consc, na.rm = TRUE)),
-                                                                  0))
 
 
  
@@ -457,76 +505,153 @@ ols_df <- ols_df %>%
 # Rerun OLS
 
 ```{r}
+
+test_ols <- ols_df %>% 
+    mutate(consc_flipped = w1_consc_imput * -1) # flipped conscientiousness measure after examining PCA loadings and directions
 # Simple models
 
-simple_ols1 <- lm_robust(data = ols_df,
-                  w4_employed ~ w4_best_edu)
+simple_ols1 <- lm_robust(data = test_ols,
+                  w4_employed ~ consc_flipped)
 
-make_simple_tables(simple_ols1, "./output/simple_ols1.rds")
 
-simple_ols2 <- lm(data = ols_df,
-                  l_total_inc ~ w4_best_edu)
+simple_ols2 <- lm(data = test_ols,
+                  l_total_inc ~ consc_flipped)
 
-make_simple_tables(simple_ols2, "./output/simple_ols2.rds")
 
 # Adding controls of educ squared, age and age squared
 
-control1 <- lm_robust(data = ols_df,
-                      w4_employed ~ w4_best_edu + w4_educ_squared + w1_age + age_sq)
+control1 <- lm_robust(data = test_ols,
+                      w4_employed ~ consc_flipped + w4_best_edu + w4_educ_squared + w1_age + age_sq)
 
-make_simple_tables(control1, "./output/control1.rds")
 
-control2 <- lm(data = ols_df,
-               l_total_inc ~ w4_best_edu + w4_educ_squared + w1_age + age_sq)
+control2 <- lm(data = test_ols,
+               l_total_inc ~ consc_flipped + w4_best_edu + w4_educ_squared + w1_age + age_sq)
 
-make_simple_tables(control2, "./output/control2.rds")
 
 # add gender and race
-control3 <- lm_robust(data = ols_df,
-                      w4_employed ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race)
+control3 <- lm_robust(data = test_ols,
+                      w4_employed ~ consc_flipped + w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race)
 
-make_simple_tables(control3, "./output/control3.rds")
 
-control4 <- lm(data = ols_df,
-               l_total_inc ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race)
+control4 <- lm(data = test_ols,
+               l_total_inc ~ consc_flipped + w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race)
 
-make_simple_tables(control4, "./output/control4.rds")
 
 # add wealth
 
-control5 <- lm_robust(data = ols_df,
-                      w4_employed ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd)
+control5 <- lm_robust(data = test_ols,
+                      w4_employed ~ consc_flipped + w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd)
 
-make_simple_tables(control5, "./output/control5.rds")
 
-control6 <- lm(data = ols_df,
-               l_total_inc ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd)
+control6 <- lm(data = test_ols,
+               l_total_inc ~ consc_flipped + w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd)
 
-make_simple_tables(control6, "./output/control6.rds")
 
 # now add conscientiousness measure
 
-full_reg1 <- lm_robust(data = ols_df,
-                      w4_employed ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd + w1_a_consc)
+full_reg1 <- lm_robust(data = test_ols,
+                      w4_employed ~ consc_flipped + w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd )
 
-make_simple_tables(full_reg1, "./output/fullreg1.rds")
 
-full_reg2 <- lm(data = ols_df,
-               l_total_inc ~ w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd + w1_a_consc)
+full_reg2 <- lm(data = test_ols,
+               l_total_inc ~ consc_flipped + w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd + consc_flipped)
 
-make_simple_tables(full_reg2, "./output/fullreg2.rds")
 
 
 # give full model with alternate age specification
 
-full_reg3 <- lm_robust(data = ols_df,
+full_reg3 <- lm_robust(data = test_ols,
                        w4_employed ~ w4_best_edu + w4_educ_squared + as.factor(w1_age_groups) + w4_best_gen + w4_best_race + wealth_index_famd + w1_a_consc)
 
-make_simple_tables(full_reg3, "./output/fullreg3.rds")
 
-full_reg4 <- lm(data = ols_df,
+full_reg4 <- lm(data = test_ols,
                l_total_inc ~ w4_best_edu + w4_educ_squared + as.factor(w1_age_groups) + w4_best_gen + w4_best_race + wealth_index_famd + w1_a_consc)
 
-make_simple_tables(full_reg4, "./output/fullreg4.rds")
+```
+
+# OLS of conscientiousness on Educ
+
+Want to see if conscientiousness explains educ and if educ's inclusion into the regression on wages makes a big difference
+
+
+```{r}
+
+educ_ols_simp <- lm(data = test_ols, 
+                    w4_best_edu ~ consc_flipped)
+
+educ_ols_multi <- lm(data = test_ols, 
+                     w4_best_edu ~ consc_flipped + as.factor(w4_best_gen) + as.factor(w4_best_race) + wealth_index_famd)
+
+quick_print(educ_ols_simp)
+quick_print(educ_ols_multi)
+
+
+ols_results <- list(educ_ols_simp, educ_ols_multi)
+create_df_for_table(ols_results, path = "./output/educ_tab.rds")
+
+employment_and_wages_results <- list(simple_ols1, control1, control3, control5, full_reg1, simple_ols2, control2, control4, control6, full_reg2)
+
+create_df_for_table(employment_and_wages_results, path = "./output/empl_wag_tab.rds")
+
+consc_educ_ols_simp <- lm(data = test_ols,
+                          consc_flipped ~ w4_best_edu)
+
+consc_educ_ols_contr <- lm(data = test_ols,
+                           consc_flipped ~ w4_best_edu + as.factor(w4_best_gen) + as.factor(w4_best_race) + wealth_index_famd)
+
+consc_educ_results <- list(consc_educ_ols_simp, consc_educ_ols_contr)
+create_df_for_table(results = consc_educ_results, path = "./output/consc_educ_tab.rds")
+
+```
+
+
+
+
+
+
+# Run ML on variables
+
+```{r}
+
+loglik <- function(theta, y, X) {
+  
+  beta <- theta[1:ncol(X)]
+  sigma <- exp(theta[ncol(X) + 1])  # ensures sigma > 0
+  
+  mu <- X %*% beta
+  
+  ll <- sum(dnorm(y, mean = mu, sd = sigma, log = TRUE))
+  
+  return(-ll)  # minimization
+}
+
+# prepare matrix of relevant variables
+
+y <- ols_df$l_total_inc
+x <- cbind(1, ols_df$w4_best_edu, ols_df$w1_a_consc)
+
+x2 <- as.data.frame(x) %>% 
+    filter(!is.na(V2)) %>% 
+    filter(!is.na(V3))
+
+start_vals <- c(
+  rep(0, ncol(x2)),  # betas
+  log(sd(y))        # log(sigma)
+)
+
+keep <- complete.cases(y, x2)
+y  <- y[keep]
+x2 <- x2[keep, ]
+
+
+mle_fit <- optim(
+  par = start_vals,
+  fn = loglik,
+  y = y,
+  X = x2,
+  method = "BFGS",
+  hessian = TRUE
+)
+
 ```
 

@@ -1,0 +1,92 @@
+---
+title: "Meeting_06_02_2026"
+output: github_document
+---
+
+Found that education is positively correlated with conscientiousness (as per [working document](Write_up_documents/Write_up_06_02_2026.pdf))
+
+```{r echo=FALSE}
+# ============================================================================
+# WHEN YOU WOULD USE HECKMAN'S APPROACH WITH YOUR DATA
+# ============================================================================
+
+# Scenario: You have conscientiousness BUT you're worried about:
+# 1. Measurement error in your conscientiousness scale
+# 2. Multiple imperfect measures you want to combine
+# 3. Reverse causality (education affects measured conscientiousness)
+# 4. Selection bias
+
+# Example: You have MULTIPLE non-cognitive measures
+# your_data <- data.frame(
+#   wage = ...,
+#   education = ...,
+#   
+#   # Multiple non-cognitive measures (all imperfect proxies)
+#   conscientiousness = ...,
+#   grit_score = ...,
+#   self_control = ...,
+#   locus_of_control = ...,
+#   
+#   # Cognitive measures
+#   iq_test = ...,
+#   math_score = ...
+# )
+
+# ============================================================================
+# STEP 1: Specify Measurement System
+# ============================================================================
+
+# Assume there's a latent "non-cognitive ability" that generates all these measures
+# Similar to how IQ tests measure latent "g"
+
+# Measurement equations:
+# conscientiousness = β0 + α_conscientiousness * f_N + education_effects + error
+# grit = β1 + α_grit * f_N + education_effects + error
+# self_control = β2 + α_self_control * f_N + education_effects + error
+
+# You need a structural equation modeling package
+# library(lavaan)
+# 
+# # Define the latent factor model
+# model_spec <- '
+#   # Latent factors
+#   NonCog =~ conscientiousness + grit_score + self_control + locus_of_control
+#   Cog =~ iq_test + math_score
+#   
+#   # Allow education to affect measurements (key Heckman insight!)
+#   conscientiousness ~ education
+#   grit_score ~ education
+#   self_control ~ education
+#   
+#   # Structural model: wage depends on latent factors
+#   log_wage ~ NonCog + Cog + education + age + experience
+# '
+# 
+# # Estimate (this is simplified - Heckman used Bayesian MCMC)
+# fit <- sem(model_spec, data = your_data)
+# summary(fit)
+# 
+# # Extract latent factor scores for each person
+# factor_scores <- lavPredict(fit)
+# your_data$f_noncog <- factor_scores[, "NonCog"]
+# your_data$f_cog <- factor_scores[, "Cog"]
+```
+
+
+# Steps:
+
+1. Specify latent factor model
+
+" NonCog =~ conscientiousness"
+
+Specify structural model: wage depends on latent factor with other observables
+
+"log_wage ~ NonCog + education + age + etc."
+
+2. Estimate structural model (Heckman used Bayesian MCMC)
+
+3. Extract factor scores
+
+4. Do nonparametric estimation with factor score obtained for conscientiousness from simulations
+
+
