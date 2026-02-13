@@ -5,7 +5,7 @@ output: github_document
 
 # Progress
 
-- [Working document]()
+- [Working document](https://github.com/mattthomo/Thesis_data_work/blob/main/Write_up_documents/Write_up_13_02_2026.pdf)
 
 - Wrote up motivation
 
@@ -13,7 +13,10 @@ output: github_document
 
 - Started literature review
 
-- 
+- Investigated numeracy test
+    - Contained in W1
+    - 1 879 recorded participants from the target population (5 867)
+` 
 
 
 
