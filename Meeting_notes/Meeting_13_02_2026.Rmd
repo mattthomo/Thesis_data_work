@@ -1,0 +1,20 @@
+---
+title: "Meeting_13_02_2026"
+output: github_document
+---
+
+# Progress
+
+- [Working document]()
+
+- Wrote up motivation
+
+- Wrote up methodology
+
+- Started literature review
+
+- 
+
+
+
+
