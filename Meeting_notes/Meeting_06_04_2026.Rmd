@@ -7,7 +7,7 @@ output: github_document
 
 1. Worked on the numerical optimisation function
 
-1.1 Got it to minimise squared difference between moments from actual and simulated dfs for equations only containing income, educ and conscientiousness
+    1.1 Got it to minimise squared difference between moments from actual and simulated dfs for equations only containing income, educ and conscientiousness
 
 
 ```{r, echo=FALSE, results='markup'}
@@ -18,7 +18,7 @@ opt_params_tab
 
 
 
-1.2 Working on getting it to do the same when including controls in model
+    1.2 Working on getting it to do the same when including controls in model
 
 
 
