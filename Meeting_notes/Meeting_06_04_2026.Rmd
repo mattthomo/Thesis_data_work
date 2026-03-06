@@ -1,0 +1,76 @@
+---
+title: "Meeting_06_04_2026"
+output: html_document
+---
+
+# Progress for the week
+
+1. Worked on the numerical optimisation function
+
+1.1 Got it to minimise squared difference between moments from actual and simulated dfs for equations only containing income, educ and conscientiousness
+
+
+```{r, echo=FALSE, results='markup'}
+opt_params_tab <- readRDS('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/opt_params_tab.rds')
+
+opt_params_tab
+```
+
+
+
+1.2 Working on getting it to do the same when including controls in model
+
+
+
+2. `sem` from Lavaan package produces the following results:
+
+```{r sem results, include=FALSE}
+library(lavaan)
+library(tidyverse)
+
+test_ols <- readRDS('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/test_ols.rds')
+
+true_df <- test_ols %>%
+    mutate(
+        race_coloured = as.integer(w4_best_race == "Coloured"),
+        race_asian    = as.integer(w4_best_race == "Asian/Indian"),
+        race_white    = as.integer(w4_best_race == "White"), # black = reference
+        gender_female = as.integer(w4_best_gen  == "Female")   # male = reference
+    )
+```
+
+```{r, echo=TRUE, results='hide'}
+sem_model <- '
+  # Measurement model: latent conscientiousness
+  consc_lat =~ 1 * consc_flipped
+
+  # Fix residual variance of indicator to 0 (perfect measurement), can play around with this to indicate measurement error
+  # or set to a known value if you have a reliability estimate
+  consc_flipped ~~ 0.8 * consc_flipped
+
+  # Structural model
+  w4_best_edu   ~ consc_lat
+  l_total_inc ~ w4_best_edu + consc_lat + w1_age + race_coloured + race_asian + race_white + gender_female + wealth_index_famd
+'
+
+
+fit <- sem(
+    model       = sem_model,
+    data        = true_df,
+    meanstructure = TRUE,            # estimates intercepts (your beta_0 terms)
+    estimator   = "ML"
+)
+
+summary(fit, fit.measures = TRUE, standardized = TRUE, estimates = TRUE)
+```
+
+
+```{r, echo=TRUE}
+# ── 3. Extract key parameter estimates ────────────────────────────────────────
+parameterEstimates(fit) %>%
+    filter(op %in% c("~", "~1", "=~")) %>%
+    select(lhs, op, rhs, est, se, pvalue) %>%
+    print()
+
+```
+

@@ -508,7 +508,13 @@ ols_df <- ols_df %>%
 
 test_ols <- ols_df %>% 
     mutate(consc_flipped = w1_consc_imput * -1) # flipped conscientiousness measure after examining PCA loadings and directions
+
+write_rds(test_ols, file = "./output/test_ols.rds")
+
+
 # Simple models
+
+
 
 simple_ols1 <- lm_robust(data = test_ols,
                   w4_employed ~ consc_flipped)
@@ -554,7 +560,7 @@ full_reg1 <- lm_robust(data = test_ols,
 
 
 full_reg2 <- lm(data = test_ols,
-               l_total_inc ~ consc_flipped + w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd + consc_flipped)
+               l_total_inc ~ consc_flipped + w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd)
 
 
 
@@ -613,45 +619,125 @@ create_df_for_table(results = consc_educ_results, path = "./output/consc_educ_ta
 
 ```{r}
 
-loglik <- function(theta, y, X) {
-  
-  beta <- theta[1:ncol(X)]
-  sigma <- exp(theta[ncol(X) + 1])  # ensures sigma > 0
-  
-  mu <- X %*% beta
-  
-  ll <- sum(dnorm(y, mean = mu, sd = sigma, log = TRUE))
-  
-  return(-ll)  # minimization
-}
+# loglik <- function(theta, y, X) {
+#   
+#   beta <- theta[1:ncol(X)]
+#   sigma <- exp(theta[ncol(X) + 1])  # ensures sigma > 0
+#   
+#   mu <- X %*% beta
+#   
+#   ll <- sum(dnorm(y, mean = mu, sd = sigma, log = TRUE))
+#   
+#   return(-ll)  # minimization
+# }
+# 
+# # prepare matrix of relevant variables
+# 
+# y <- ols_df$l_total_inc
+# x <- cbind(1, ols_df$w4_best_edu, ols_df$w1_a_consc)
+# 
+# x2 <- as.data.frame(x) %>% 
+#     filter(!is.na(V2)) %>% 
+#     filter(!is.na(V3))
+# 
+# start_vals <- c(
+#   rep(0, ncol(x2)),  # betas
+#   log(sd(y))        # log(sigma)
+# )
+# 
+# keep <- complete.cases(y, x2)
+# y  <- y[keep]
+# x2 <- x2[keep, ]
+# 
+# 
+# mle_fit <- optim(
+#   par = start_vals,
+#   fn = loglik,
+#   y = y,
+#   X = x2,
+#   method = "BFGS",
+#   hessian = TRUE
+# )
 
-# prepare matrix of relevant variables
-
-y <- ols_df$l_total_inc
-x <- cbind(1, ols_df$w4_best_edu, ols_df$w1_a_consc)
-
-x2 <- as.data.frame(x) %>% 
-    filter(!is.na(V2)) %>% 
-    filter(!is.na(V3))
-
-start_vals <- c(
-  rep(0, ncol(x2)),  # betas
-  log(sd(y))        # log(sigma)
-)
-
-keep <- complete.cases(y, x2)
-y  <- y[keep]
-x2 <- x2[keep, ]
+```
 
 
-mle_fit <- optim(
-  par = start_vals,
-  fn = loglik,
-  y = y,
-  X = x2,
-  method = "BFGS",
-  hessian = TRUE
-)
+# Simulation work
 
+```{r}
+# first want to create row vector of important moments in observed df
+
+observed_moments_df <- test_ols %>%
+    summarise(
+        mean_loginc = mean(l_total_inc, na.rm = T),
+        sd_loginc = sd(l_total_inc, na.rm = T),
+        mean_educ = mean(w4_best_edu, na.rm = T),
+        sd_educ = sd(w4_best_edu, na.rm = T),
+        mean_consc = mean(consc_flipped, na.rm = T),
+        sd_consc = sd(consc_flipped, na.rm = T),
+        
+    )
+
+write_rds(observed_moments_df, file = "./output/observed_moments.rds")
+
+
+# now want to create df which includes regression coefficients from observed data
+
+sim_ols <- lm(l_total_inc ~ w4_best_edu + consc_flipped,
+              data = test_ols)
+
+r_square_df1 <- summary(sim_ols)
+
+r_square_df2 <- summary(educ_ols_simp)
+
+observed_coefficients_df <- as.data.frame(educ_ols_simp$coefficients) %>% 
+    pivot_wider(names_from = "educ_ols_simp$coefficients",
+                values_from = "educ_ols_simp$coefficients") %>% 
+    rename("educ_reg_Intercept" = 1,
+           "educ_reg_Conscientiousness" = 2) %>% 
+    mutate(educ_reg_r_squared = r_square_df2$r.squared)
+
+
+
+income_reg_info <- as.data.frame(sim_ols$coefficients) %>% 
+    pivot_wider(names_from = "sim_ols$coefficients",
+                values_from = "sim_ols$coefficients") %>% 
+    rename("inc_reg_intercept" = 1,
+           "inc_reg_educ" = 2,
+           "inc_reg_consc" = 3) %>% 
+    mutate(inc_reg_r_squared = r_square_df1$r.squared)
+
+observed_df_alles <- observed_moments_df %>% 
+    cbind(observed_coefficients_df, income_reg_info)
+
+write_rds(observed_df_alles, file = "./output/observed_tab.rds")
+
+sim_ols_controls <- lm(data = test_ols,
+               l_total_inc ~ w4_best_edu + consc_flipped + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd)
+
+r_square_3 <- summary(sim_ols_controls)
+
+observed_coef_control_df <- as.data.frame(sim_ols_controls$coefficients) %>% 
+    pivot_wider(names_from = "sim_ols_controls$coefficients",
+                values_from = "sim_ols_controls$coefficients") %>% 
+    rename("inc_reg_intercept" = 1,
+           "inc_reg_educ" = 2,
+           "inc_reg_consc" = 3,
+           "inc_reg_educ_squared" = 4,
+           "inc_reg_age" = 5,
+           "inc_reg_age_sq" = 6,
+           "inc_reg_female" = 7,
+           "inc_reg_coloured" = 8,
+           "inc_reg_asian" = 9,
+           "inc_reg_white" = 10,
+           "inc_reg_wealth" = 11) %>% 
+    mutate(inc_reg_r_squared = r_square_3$r.squared)
+
+
+
+observed_df_alles2 <- observed_moments_df %>% 
+    cbind(observed_coefficients_df, observed_coef_control_df)
+
+write_rds(observed_df_alles2, file = "./output/observed_tab2.rds")
 ```
 
