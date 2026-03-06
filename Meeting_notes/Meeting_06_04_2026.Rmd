@@ -1,6 +1,6 @@
 ---
 title: "Meeting_06_04_2026"
-output: html_document
+output: github_document
 ---
 
 # Progress for the week
