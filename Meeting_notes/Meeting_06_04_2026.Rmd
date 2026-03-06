@@ -12,13 +12,14 @@ output: github_document
 
 ```{r, echo=FALSE, results='markup'}
 opt_params_tab <- readRDS('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/opt_params_tab.rds')
-
 opt_params_tab
 ```
 
 
 
-    1.2 Working on getting it to do the same when including controls in model
+
+
+1.2 Working on getting it to do the same when including controls in model
 
 
 
