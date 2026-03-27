@@ -433,18 +433,22 @@ sim_function_controls <- function(par, n, target_coefs){
 
 
     params <- c(
-        beta_0_educ   = par[1],
-        alpha_educ    = par[2],
-        beta_0_income = par[3],
-        gamma_income  = par[4],
-        alpha_income  = par[5],
-        u_consc       = par[6],
-        u_educ        = par[7],
-        u_income      = par[8],
-        delta_income_white = par[9],
-        delta_income_coloured = par[10],
-        delta_income_asian = par[11],
-        mu_income = par[12]
+        beta_0_educ            = par[1],
+        alpha_educ             = par[2],
+        beta_0_income          = par[3],
+        gamma_income           = par[4],
+        alpha_income           = par[5],
+        u_consc                = par[6],
+        u_educ                 = par[7],
+        u_income               = par[8],
+        delta_income_white     = par[9],
+        delta_income_coloured  = par[10],
+        delta_income_asian     = par[11],
+        delta_income_female    = par[12],
+        delta_income_age       = par[13],
+        delta_income_age_squared = par[14],
+        delta_income_educ_squared = par[15],
+        delta_income_wealth    = par[16]
     )
 
 
@@ -506,7 +510,7 @@ sim_function_controls <- function(par, n, target_coefs){
 
     educ   <- as.numeric(params["beta_0_educ"]) + as.numeric(params["alpha_educ"]) * consc_measure + e_educ
 
-    income <- log(
+    income <-
         as.numeric(params["beta_0_income"]) +
             as.numeric(params["gamma_income"]) * educ +
             as.numeric(params["alpha_income"]) * consc_measure +
@@ -519,7 +523,7 @@ sim_function_controls <- function(par, n, target_coefs){
             as.numeric(params["delta_income_female"]) * gender_female +
             as.numeric(params["delta_income_wealth"]) * wealth_sim +
             e_income
-    )
+
 
     sim_df <- data.frame(
         consc        = consc,
@@ -615,21 +619,172 @@ sim_function_controls <- function(par, n, target_coefs){
 }
 
 
+sim_function_controls_moments <- function(par, n, target_coefs){
 
+
+    params <- c(
+        beta_0_educ            = par[1],
+        alpha_educ             = par[2],
+        beta_0_income          = par[3],
+        gamma_income           = par[4],
+        alpha_income           = par[5],
+        u_consc                = par[6],
+        u_educ                 = par[7],
+        u_income               = par[8],
+        delta_income_white     = par[9],
+        delta_income_coloured  = par[10],
+        delta_income_asian     = par[11],
+        delta_income_female    = par[12],
+        delta_income_age       = par[13],
+        delta_income_age_squared = par[14],
+        delta_income_educ_squared = par[15],
+        delta_income_wealth    = par[16]
+    )
+
+
+
+    library(tidyverse)
+
+    set.seed(123456)
+
+
+
+
+
+
+    #### Variables #####
+
+    # Add race
+
+    # simulate a factor variable, e.g. race with 4 levels
+    race <- factor(sample(c("black", "coloured", "asian", "white"), n, replace = TRUE,
+                          prob = c(0.8, 0.13, 0.02, 0.05)),
+                   levels = c("black", "coloured", "asian", "white"))  # set probs to match your true data
+
+    race_coloured <- as.numeric(race == "coloured")
+    race_asian <- as.numeric(race == "asian")
+    race_white <- as.numeric(race == "white")
+
+
+
+    # Add gender
+
+    gender <- factor(sample(c("male", "female"), n, replace = T,
+                            prob = c(0.47, 0.53)),
+                     levels = c("male", "female"))
+
+    gender_female <- as.numeric(gender == "female")
+
+
+
+    # educ <- rnorm(n = 100, mean = 10, sd = 1)
+
+    consc <- rnorm(n, mean = 0, sd = 1)
+
+    age <- runif(n, min = 14, max = 23)
+
+    wealth_sim <- rnorm(n, mean = 0, sd = 1.8)
+
+
+    ##### Parameters ####
+
+    # Set in function arguments
+
+    ##### Equations #####
+
+    e_consc  <- rnorm(n, mean = 0, sd = exp(params["u_consc"]))
+    e_educ   <- rnorm(n, mean = 0, sd = exp(params["u_educ"]))
+    e_income <- rnorm(n, mean = 0, sd = exp(params["u_income"]))
+
+    consc_measure <- consc + e_consc # Conscientiousness equation
+
+    educ   <- as.numeric(params["beta_0_educ"]) + as.numeric(params["alpha_educ"]) * consc_measure + e_educ
+
+    income <-
+        as.numeric(params["beta_0_income"]) +
+        as.numeric(params["gamma_income"]) * educ +
+        as.numeric(params["alpha_income"]) * consc_measure +
+        as.numeric(params["delta_income_educ_squared"]) * educ^2 +
+        as.numeric(params["delta_income_age"]) * age +
+        as.numeric(params["delta_income_age_squared"]) * age^2 +
+        as.numeric(params["delta_income_coloured"]) * race_coloured +
+        as.numeric(params["delta_income_asian"]) * race_asian +
+        as.numeric(params["delta_income_white"]) * race_white +
+        as.numeric(params["delta_income_female"]) * gender_female +
+        as.numeric(params["delta_income_wealth"]) * wealth_sim +
+        e_income
+
+
+    sim_df <- data.frame(
+        consc        = consc,
+        consc_meas   = consc_measure,
+        educ         = educ,
+        income       = income,
+        age          = age,
+        race_coloured = race_coloured,
+        race_asian = race_asian,
+        race_white = race_white,
+        gender_female = gender_female,
+        age_squared = age^2,
+        educ_squared = educ^2,
+        wealth_sim = wealth_sim
+    )
+
+
+    simulated_moments_df <- sim_df %>%
+        summarise(
+            mean_loginc = mean(income, na.rm = T),
+            sd_loginc = sd(income, na.rm = T),
+            mean_educ = mean(educ, na.rm = T),
+            sd_educ = sd(educ, na.rm = T),
+            mean_consc = mean(consc, na.rm = T),
+            sd_consc = sd(consc, na.rm = T),
+            mean_age = mean(age, na.rm = T),
+            sd_age = sd(age, na.rm = T),
+            mean_wealth_sim = mean(wealth_sim, na.rm = T),
+            sd_wealth_sim = sd(wealth_sim, na.rm = T)
+        )
+
+
+    observed_moments_df <- readRDS('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/observed_tab2.rds')
+
+
+
+
+    sim_coefs <- comparison_df$simulated_data
+
+    loss <- sum((sim_coefs - target_coefs)^2)
+    return(loss)
+
+
+}
 
 init_par <- c(
-    12,       # beta_0_educ
-    1.5,      # alpha_educ
-    20,       # beta_0_income
-    2.0,      # gamma_income
-    1.0,      # alpha_income
-    log(1),   # u_consc SD (exp(0) = 1)
-    log(1),   # u_educ SD
-    log(1),   # u_income SD
-    1,
-    0.5,
-    1.1,
-    1
+    # education equation
+    10,     # beta_0_educ: intercept (mean years of education)
+    0.5,    # alpha_educ: positive effect of conscientiousness on education
+
+    # income equation
+    5,      # beta_0_income: intercept
+    0.3,    # gamma_income: positive return to education
+    0.2,    # alpha_income: positive effect of conscientiousness on income
+
+    # error SDs (on log scale because you use exp() inside sim)
+    log(1), # u_consc: SD of conscientiousness error
+    log(1), # u_educ: SD of education error
+    log(1), # u_income: SD of income error
+
+    # race effects on income (relative to black = reference)
+    0.3,    # delta_income_white: white wage premium
+    0.1,    # delta_income_coloured: coloured wage premium
+    0.2,    # delta_income_asian: asian wage premium
+
+    # other controls
+    0.1,    # delta_income_female: gender wage gap
+    0.05,   # delta_income_age: age effect
+    -0.001, # delta_income_age_squared: diminishing age returns
+    -0.01,  # delta_income_educ_squared: diminishing education returns
+    0.2     # delta_income_wealth: wealth effect
 )
 
 
@@ -639,7 +794,7 @@ result <- optim(
     par          = init_par,
     fn           = sim_function_controls,
     target_coefs = target_coefs2,
-    n            = 100,
+    n            = 10000,
     method       = "Nelder-Mead"
 )
 
@@ -647,8 +802,14 @@ result$par        # optimal parameter values
 result$value
 
 
+obs_lm1 <- lm(w4_best_edu ~ consc_flipped,
+              data = test_ols)
+obs_lm2 <- lm(l_total_inc ~ w4_best_edu + consc_flipped + ,
+              data = test_ols)
 
 
+
+weights2 <-
 
 
 

@@ -9,7 +9,7 @@ This README captures all my code which I had used in the creation of my thesis f
 
 rm(list = ls()) # Clean your environment:
 gc() # garbage collection - It can be useful to call gc after a large object has been removed, as this may prompt R to return memory to the operating system.
-pacman::p_load(tidyverse, foreign, haven, estimatr, broom, kableExtra, FactoMineR, pcaMethods, missMDA)
+pacman::p_load(tidyverse, foreign, haven, estimatr, broom, kableExtra, FactoMineR, pcaMethods, missMDA, mlrMBO, maxLik)
 list.files('code/', full.names = T, recursive = T) %>% .[grepl('.R', .)] %>% as.list() %>% walk(~source(.))
 ```
 
@@ -615,49 +615,84 @@ create_df_for_table(results = consc_educ_results, path = "./output/consc_educ_ta
 
 
 
-# Run ML on variables
+# Run MLE on variables
 
 ```{r}
+# create dummies from observed data first
+test_ols <- test_ols %>%
+  mutate(
+    race_coloured = as.numeric(w4_best_race == "Coloured"),
+    race_asian    = as.numeric(w4_best_race == "Asian/Indian"),
+    race_white    = as.numeric(w4_best_race == "White"),
+    gender_female = as.numeric(w4_best_gen  == "Female")
+  )
 
-# loglik <- function(theta, y, X) {
-#   
-#   beta <- theta[1:ncol(X)]
-#   sigma <- exp(theta[ncol(X) + 1])  # ensures sigma > 0
-#   
-#   mu <- X %*% beta
-#   
-#   ll <- sum(dnorm(y, mean = mu, sd = sigma, log = TRUE))
-#   
-#   return(-ll)  # minimization
-# }
-# 
-# # prepare matrix of relevant variables
-# 
-# y <- ols_df$l_total_inc
-# x <- cbind(1, ols_df$w4_best_edu, ols_df$w1_a_consc)
-# 
-# x2 <- as.data.frame(x) %>% 
-#     filter(!is.na(V2)) %>% 
-#     filter(!is.na(V3))
-# 
-# start_vals <- c(
-#   rep(0, ncol(x2)),  # betas
-#   log(sd(y))        # log(sigma)
-# )
-# 
-# keep <- complete.cases(y, x2)
-# y  <- y[keep]
-# x2 <- x2[keep, ]
-# 
-# 
-# mle_fit <- optim(
-#   par = start_vals,
-#   fn = loglik,
-#   y = y,
-#   X = x2,
-#   method = "BFGS",
-#   hessian = TRUE
-# )
+# check where missings are
+colSums(is.na(test_ols))
+
+# drop all rows with any missing values
+test_ols_clean <- test_ols %>%
+  drop_na(l_total_inc, w4_best_edu, consc_flipped, w1_age, 
+          race_coloured, race_asian, race_white, 
+          gender_female, wealth_index_famd)
+
+# check how many rows you lost
+nrow(true_df)
+nrow(true_df_clean)
+
+# then specify log likelihood
+ll <- function(params) {
+  
+  beta_0                  <- params[1]
+  gamma_income(educ)            <- params[2]
+  alpha_income(consc)            <- params[3]
+  delta_age               <- params[4]
+  delta_age_squared       <- params[5]
+  delta_educ_squared      <- params[6]
+  delta_coloured          <- params[7]
+  delta_asian             <- params[8]
+  delta_white             <- params[9]
+  delta_female            <- params[10]
+  delta_wealth            <- params[11]
+  sigma                   <- exp(params[12])  # always positive
+  
+  predicted <- beta_0 +
+               gamma_income       * test_ols_clean$w4_best_edu +
+               alpha_income       * test_ols_clean$consc_flipped +
+               delta_age          * test_ols_clean$w1_age +
+               delta_age_squared  * test_ols_clean$w1_age^2 +
+               delta_educ_squared * test_ols_clean$w4_best_edu^2 +
+               delta_coloured     * test_ols_clean$race_coloured +
+               delta_asian        * test_ols_clean$race_asian +
+               delta_white        * test_ols_clean$race_white +
+               delta_female       * test_ols_clean$gender_female +
+               delta_wealth       * test_ols_clean$wealth_index_famd
+  
+  sum(dnorm(test_ols_clean$l_total_inc,
+            mean = predicted,
+            sd   = sigma,
+            log  = TRUE))
+}
+
+result_ml <- maxLik(ll, 
+                    start = c(
+  beta_0             = 5,
+  gamma_income       = 0.3,
+  alpha_income       = 0.2,
+  delta_age          = 0.05,
+  delta_age_squared  = -0.001,
+  delta_educ_squared = -0.01,
+  delta_coloured     = 0.1,
+  delta_asian        = 0.2,
+  delta_white        = 0.3,
+  delta_female       = -0.1,
+  delta_wealth       = 0.2,
+  sigma              = log(1)
+))
+
+ml_table <- as.data.frame(summary(result_ml)$estimate)
+
+write_rds(ml_table, file = "./output/ml_tab.rds")
 
 ```
 
@@ -674,12 +709,26 @@ observed_moments_df <- test_ols %>%
         mean_educ = mean(w4_best_edu, na.rm = T),
         sd_educ = sd(w4_best_edu, na.rm = T),
         mean_consc = mean(consc_flipped, na.rm = T),
-        sd_consc = sd(consc_flipped, na.rm = T),
-        
+        sd_consc = sd(consc_flipped, na.rm = T)
     )
 
-write_rds(observed_moments_df, file = "./output/observed_moments.rds")
+observed_moments_controls_df <- test_ols %>%
+    summarise(
+        mean_loginc = mean(l_total_inc, na.rm = T),
+        sd_loginc = sd(l_total_inc, na.rm = T),
+        mean_educ = mean(w4_best_edu, na.rm = T),
+        sd_educ = sd(w4_best_edu, na.rm = T),
+        mean_consc = mean(consc_flipped, na.rm = T),
+        sd_consc = sd(consc_flipped, na.rm = T),
+        mean_age = mean(w1_age, na.rm = T),
+        sd_age = sd(w1_age, na.rm = T),
+        mean_wealth = mean(wealth_index_famd, na.rm = T),
+        sd_wealth = sd(wealth_index_famd, na.rm = T)
+    ) %>% 
+    cbind(observed_coefficients_df, observed_coef_control_df)
 
+write_rds(observed_moments_df, file = "./output/observed_moments.rds")
+write_rds(observed_moments_controls_df, file = "./output/observed_moments_controls.rds")
 
 # now want to create df which includes regression coefficients from observed data
 
@@ -712,6 +761,20 @@ observed_df_alles <- observed_moments_df %>%
 
 write_rds(observed_df_alles, file = "./output/observed_tab.rds")
 
+observed_df_alles_targets <- observed_df_alles %>% 
+    pivot_longer(cols = everything(),
+                 names_to = "Parameter",
+                 values_to = "Value")
+
+target_values_simple <- observed_df_alles_targets$Value
+
+observed_df_alles_targets_controls <- observed_moments_controls_df %>% 
+    pivot_longer(cols = everything(),
+                 names_to = "Parameter",
+                 values_to = "Value")
+
+target_values_controls <- observed_df_alles_targets_controls$Value
+
 sim_ols_controls <- lm(data = test_ols,
                l_total_inc ~ w4_best_edu + consc_flipped + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd)
 
@@ -731,8 +794,40 @@ observed_coef_control_df <- as.data.frame(sim_ols_controls$coefficients) %>%
            "inc_reg_asian" = 9,
            "inc_reg_white" = 10,
            "inc_reg_wealth" = 11) %>% 
-    mutate(inc_reg_r_squared = r_square_3$r.squared)
+    mutate(inc_reg_r_squared = r_square_3$r.squared) 
 
+std_errors_full_ols <- as.data.frame(summary(sim_ols_controls)$coefficients[, "Std. Error"])  %>% 
+    rename("Std_error" = 1) %>% 
+    mutate(weights = 1/ (Std_error^2)) %>% 
+    mutate(weights_scaled = weights/sum(weights)) %>% 
+    rownames_to_column(var = "parameter") %>% 
+    mutate(parameter = case_when(
+    parameter == "(Intercept)"            ~ "beta_0_income",
+    parameter == "w4_best_edu"            ~ "gamma_income",
+    parameter == "consc_flipped"          ~ "alpha_income",
+    parameter == "w4_best_raceWhite"      ~ "delta_income_white",
+    parameter == "w4_best_raceColoured"   ~ "delta_income_coloured",
+    parameter == "w4_best_raceAsian/Indian" ~ "delta_income_asian",
+    parameter == "w4_best_genFemale"      ~ "delta_income_female",
+    parameter == "w1_age"                 ~ "delta_income_age",
+    parameter == "age_sq"                 ~ "delta_income_age_squared",
+    parameter == "w4_educ_squared"        ~ "delta_income_educ_squared",
+    parameter == "wealth_index_famd"      ~ "delta_income_wealth"
+  ))
+
+weights_controls <- std_errors_full_ols$
+
+
+race_props <- prop.table(table(test_ols$w4_best_race))
+gender_props <- prop.table(table(test_ols$w4_best_gen))
+
+observed_coef_control_df <- c(
+    observed_coef_control_df,
+    prop_coloured = race_props["Coloured"],
+    prop_white = race_props["White"],
+    prop_asian = race_props["Asian/Indian"],
+    prop_female = gender_props["Female"]
+)
 
 
 observed_df_alles2 <- observed_moments_df %>% 
