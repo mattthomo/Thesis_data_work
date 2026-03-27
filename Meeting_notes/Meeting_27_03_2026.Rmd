@@ -20,7 +20,7 @@ library(tidyverse)
     - Weighted moments (mean and standard deviation) of variables by inverse of variance
     - Weighted coefficients by inverse of squared standard error
 
-5. Used `mlrMBO` package to find global optima (scripts for simple and multivariate models found [here]() and [here]())
+5. Used `mlrMBO` package to find global optima (scripts for simple and multivariate models found [here](https://github.com/mattthomo/Thesis_data_work/blob/main/Simulation_scripts/simulation_simple.R) and [here](https://github.com/mattthomo/Thesis_data_work/blob/main/Simulation_scripts/simulation_controls.R))
 
     - Simple results
     
