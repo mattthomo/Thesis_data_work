@@ -22,7 +22,7 @@ library(tidyverse)
 
 5. Used `mlrMBO` package to find global optima (scripts for simple and multivariate models found [here](https://github.com/mattthomo/Thesis_data_work/blob/main/Simulation_scripts/simulation_simple.R) and [here](https://github.com/mattthomo/Thesis_data_work/blob/main/Simulation_scripts/simulation_controls.R))
 
-    - Simple results
+- Simple results
     
 ```{r, echo=FALSE, results='markup'}
 mbo_results_simple <- readRDS('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/mbo_simple.rds')
@@ -30,7 +30,7 @@ mbo_results_simple <- readRDS('/Users/matthewthompson/Documents/Stellenbosch Uni
 mbo_results_simple
 ```
 
-    - With controls
+- With controls
 
 ```{r, echo=FALSE, results='markup'}
 mbo_results_controls <- readRDS('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/mbo_control.rds')
