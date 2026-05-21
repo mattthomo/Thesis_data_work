@@ -9,7 +9,7 @@ This README captures all my code which I had used in the creation of my thesis f
 
 rm(list = ls()) # Clean your environment:
 gc() # garbage collection - It can be useful to call gc after a large object has been removed, as this may prompt R to return memory to the operating system.
-pacman::p_load(tidyverse, foreign, haven, estimatr, broom, kableExtra, FactoMineR, pcaMethods, missMDA, mlrMBO, maxLik)
+pacman::p_load(tidyverse, foreign, haven, estimatr, broom, kableExtra, FactoMineR, pcaMethods, missMDA, mlrMBO, maxLik, mlr, parallelMap)
 list.files('code/', full.names = T, recursive = T) %>% .[grepl('.R', .)] %>% as.list() %>% walk(~source(.))
 ```
 
@@ -636,16 +636,12 @@ test_ols_clean <- test_ols %>%
           race_coloured, race_asian, race_white, 
           gender_female, wealth_index_famd)
 
-# check how many rows you lost
-nrow(true_df)
-nrow(true_df_clean)
-
 # then specify log likelihood
 ll <- function(params) {
   
   beta_0                  <- params[1]
-  gamma_income(educ)            <- params[2]
-  alpha_income(consc)            <- params[3]
+  gamma_income            <- params[2] # education
+  alpha_income            <- params[3] # conscientiousness
   delta_age               <- params[4]
   delta_age_squared       <- params[5]
   delta_educ_squared      <- params[6]
@@ -690,16 +686,112 @@ result_ml <- maxLik(ll,
   sigma              = log(1)
 ))
 
+result_ml$code
 ml_table <- as.data.frame(summary(result_ml)$estimate)
 
 write_rds(ml_table, file = "./output/ml_tab.rds")
 
+test_ols_clean %>%
+  select(w4_best_edu, consc_flipped, w1_age, 
+         race_coloured, race_asian, race_white,
+         gender_female, wealth_index_famd) %>%
+  summarise(across(everything(), var))
+
+X <- model.matrix(~ w4_best_edu + consc_flipped + w1_age +
+                    I(w1_age^2) + I(w4_best_edu^2) +
+                    race_coloured + race_asian + race_white +
+                    gender_female + wealth_index_famd,
+                  data = test_ols_clean)
+kappa(X) 
 ```
+
+Run into problem where intercept term fails to produce standard errors. Try to fix this in next chunk.
+
+```{r}
+test_ols_clean <- test_ols_clean %>%
+  mutate(
+    age_c    = w1_age - mean(w1_age, na.rm = TRUE),
+    educ_c   = w4_best_edu - mean(w4_best_edu, na.rm = TRUE),
+    wealth_c = wealth_index_famd - mean(wealth_index_famd, na.rm = TRUE),
+    consc_c  = consc_flipped - mean(consc_flipped, na.rm = TRUE)
+  )
+
+ll <- function(params) {
+  
+  beta_0             <- params[1]
+  gamma_income       <- params[2]
+  alpha_income       <- params[3]
+  delta_age          <- params[4]
+  delta_age_squared  <- params[5]
+  delta_educ_squared <- params[6]
+  delta_coloured     <- params[7]
+  delta_asian        <- params[8]
+  delta_white        <- params[9]
+  delta_female       <- params[10]
+  delta_wealth       <- params[11]
+  sigma              <- exp(params[12])
+  
+  predicted <- beta_0 +
+               gamma_income       * test_ols_clean$educ_c +
+               alpha_income       * test_ols_clean$consc_c +
+               delta_age          * test_ols_clean$age_c +
+               delta_age_squared  * test_ols_clean$age_c^2 +
+               delta_educ_squared * test_ols_clean$educ_c^2 +
+               delta_coloured     * test_ols_clean$race_coloured +
+               delta_asian        * test_ols_clean$race_asian +
+               delta_white        * test_ols_clean$race_white +
+               delta_female       * test_ols_clean$gender_female +
+               delta_wealth       * test_ols_clean$wealth_c
+  
+  log_lik <- dnorm(test_ols_clean$l_total_inc,
+                   mean = predicted,
+                   sd   = sigma,
+                   log  = TRUE)
+  
+  if (any(!is.finite(log_lik))) return(-1e10)
+  
+  sum(log_lik)
+}
+
+# after centering, intercept = mean of log income at mean of all covariates
+start_vals <- c(
+  beta_0             = mean(test_ols_clean$l_total_inc, na.rm = TRUE),  # update this
+  gamma_income       = 0.3,
+  alpha_income       = 0.2,
+  delta_age          = 0.05,
+  delta_age_squared  = -0.001,
+  delta_educ_squared = -0.01,
+  delta_coloured     = 0.1,
+  delta_asian        = 0.2,
+  delta_white        = 0.3,
+  delta_female       = -0.1,
+  delta_wealth       = 0.2,
+  sigma              = log(1)
+)
+
+result_ml <- maxLik(ll, start = start_vals, method = "BFGS",
+                    control = list(iterlim = 10000))
+
+# check hessian diagonal is all negative (at a maximum)
+diag(result_ml$hessian)
+
+# check inverse hessian diagonal is all positive (valid variances)
+diag(solve(-result_ml$hessian))
+
+# check convergence
+result_ml$code
+result_ml$gradient
+
+ml_table <- as.data.frame(summary(result_ml)$estimate)
+
+```
+
+
 
 
 # Simulation work
 
-```{r}
+```{r Simulation}
 # first want to create row vector of important moments in observed df
 
 observed_moments_df <- test_ols %>%
@@ -711,6 +803,41 @@ observed_moments_df <- test_ols %>%
         mean_consc = mean(consc_flipped, na.rm = T),
         sd_consc = sd(consc_flipped, na.rm = T)
     )
+
+sim_ols <- lm(l_total_inc ~ w4_best_edu + consc_flipped,
+              data = test_ols)
+
+r_square_df1 <- summary(sim_ols)
+
+r_square_df2 <- summary(educ_ols_simp)
+
+observed_coefficients_df <- as.data.frame(educ_ols_simp$coefficients) %>% 
+    pivot_wider(names_from = "educ_ols_simp$coefficients",
+                values_from = "educ_ols_simp$coefficients") %>% 
+    rename("educ_reg_Intercept" = 1,
+           "educ_reg_Conscientiousness" = 2) %>% 
+    mutate(educ_reg_r_squared = r_square_df2$r.squared)
+
+sim_ols_controls <- lm(data = test_ols,
+               l_total_inc ~ w4_best_edu + consc_flipped + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd)
+
+r_square_3 <- summary(sim_ols_controls)
+
+observed_coef_control_df <- as.data.frame(sim_ols_controls$coefficients) %>% 
+    pivot_wider(names_from = "sim_ols_controls$coefficients",
+                values_from = "sim_ols_controls$coefficients") %>% 
+    rename("inc_reg_intercept" = 1,
+           "inc_reg_educ" = 2,
+           "inc_reg_consc" = 3,
+           "inc_reg_educ_squared" = 4,
+           "inc_reg_age" = 5,
+           "inc_reg_age_sq" = 6,
+           "inc_reg_female" = 7,
+           "inc_reg_coloured" = 8,
+           "inc_reg_asian" = 9,
+           "inc_reg_white" = 10,
+           "inc_reg_wealth" = 11) %>% 
+    mutate(inc_reg_r_squared = r_square_3$r.squared)
 
 observed_moments_controls_df <- test_ols %>%
     summarise(
@@ -732,19 +859,7 @@ write_rds(observed_moments_controls_df, file = "./output/observed_moments_contro
 
 # now want to create df which includes regression coefficients from observed data
 
-sim_ols <- lm(l_total_inc ~ w4_best_edu + consc_flipped,
-              data = test_ols)
 
-r_square_df1 <- summary(sim_ols)
-
-r_square_df2 <- summary(educ_ols_simp)
-
-observed_coefficients_df <- as.data.frame(educ_ols_simp$coefficients) %>% 
-    pivot_wider(names_from = "educ_ols_simp$coefficients",
-                values_from = "educ_ols_simp$coefficients") %>% 
-    rename("educ_reg_Intercept" = 1,
-           "educ_reg_Conscientiousness" = 2) %>% 
-    mutate(educ_reg_r_squared = r_square_df2$r.squared)
 
 
 
@@ -775,26 +890,7 @@ observed_df_alles_targets_controls <- observed_moments_controls_df %>%
 
 target_values_controls <- observed_df_alles_targets_controls$Value
 
-sim_ols_controls <- lm(data = test_ols,
-               l_total_inc ~ w4_best_edu + consc_flipped + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd)
-
-r_square_3 <- summary(sim_ols_controls)
-
-observed_coef_control_df <- as.data.frame(sim_ols_controls$coefficients) %>% 
-    pivot_wider(names_from = "sim_ols_controls$coefficients",
-                values_from = "sim_ols_controls$coefficients") %>% 
-    rename("inc_reg_intercept" = 1,
-           "inc_reg_educ" = 2,
-           "inc_reg_consc" = 3,
-           "inc_reg_educ_squared" = 4,
-           "inc_reg_age" = 5,
-           "inc_reg_age_sq" = 6,
-           "inc_reg_female" = 7,
-           "inc_reg_coloured" = 8,
-           "inc_reg_asian" = 9,
-           "inc_reg_white" = 10,
-           "inc_reg_wealth" = 11) %>% 
-    mutate(inc_reg_r_squared = r_square_3$r.squared) 
+ 
 
 std_errors_full_ols <- as.data.frame(summary(sim_ols_controls)$coefficients[, "Std. Error"])  %>% 
     rename("Std_error" = 1) %>% 
@@ -815,7 +911,7 @@ std_errors_full_ols <- as.data.frame(summary(sim_ols_controls)$coefficients[, "S
     parameter == "wealth_index_famd"      ~ "delta_income_wealth"
   ))
 
-weights_controls <- std_errors_full_ols$
+weights_controls <- std_errors_full_ols$weights_scaled
 
 
 race_props <- prop.table(table(test_ols$w4_best_race))
@@ -834,5 +930,72 @@ observed_df_alles2 <- observed_moments_df %>%
     cbind(observed_coefficients_df, observed_coef_control_df)
 
 write_rds(observed_df_alles2, file = "./output/observed_tab2.rds")
+```
+
+Want to restrict sample to only black males to try and get more accurate estimates on a smaller sample before extrapolating results.
+
+```{r}
+
+observed_moments_df_black_males <- test_ols %>%
+    filter(w1_best_gen == 1,
+           w4_best_race == "African") %>% 
+    summarise(
+        mean_loginc = mean(l_total_inc, na.rm = T),
+        sd_loginc = sd(l_total_inc, na.rm = T),
+        mean_educ = mean(w4_best_edu, na.rm = T),
+        sd_educ = sd(w4_best_edu, na.rm = T),
+        mean_consc = mean(consc_flipped, na.rm = T),
+        sd_consc = sd(consc_flipped, na.rm = T)
+    )
+
+sim_ols_black_males <- lm(l_total_inc ~ w4_best_edu + consc_flipped,
+              data = test_ols %>%
+                  filter(w1_best_gen == 1,
+                         w4_best_race == "African"))
+
+r_square_df1 <- summary(sim_ols_black_males)
+
+educ_ols_simp_black_males <- lm(data = test_ols %>%
+                                    filter(w1_best_gen == 1,
+                                           w4_best_race == "African"), 
+                                w4_best_edu ~ consc_flipped)
+
+r_square_df2 <- summary(educ_ols_simp_black_males)
+
+observed_coefficients_df_black_males <- as.data.frame(educ_ols_simp_black_males$coefficients) %>% 
+    pivot_wider(names_from = "educ_ols_simp_black_males$coefficients",
+                values_from = "educ_ols_simp_black_males$coefficients") %>% 
+    rename("educ_reg_Intercept" = 1,
+           "educ_reg_Conscientiousness" = 2) %>% 
+    mutate(educ_reg_r_squared = r_square_df2$r.squared)
+
+
+
+write_rds(observed_moments_df_black_males, file = "./output/observed_moments_black_males.rds")
+
+# now want to create df which includes regression coefficients from observed data
+
+
+income_reg_info_black_males <- as.data.frame(sim_ols_black_males$coefficients) %>% 
+    pivot_wider(names_from = "sim_ols_black_males$coefficients",
+                values_from = "sim_ols_black_males$coefficients") %>% 
+    rename("inc_reg_intercept" = 1,
+           "inc_reg_educ" = 2,
+           "inc_reg_consc" = 3) %>% 
+    mutate(inc_reg_r_squared = r_square_df1$r.squared)
+
+observed_df_alles_black_males <- observed_moments_df_black_males %>% 
+    cbind(observed_coefficients_df_black_males, income_reg_info_black_males)
+
+write_rds(observed_df_alles_black_males, file = "./output/observed_tab_black_males.rds")
+
+observed_df_alles_targets_black_males <- observed_df_alles_black_males %>% 
+    pivot_longer(cols = everything(),
+                 names_to = "Parameter",
+                 values_to = "Value")
+
+target_values_simple_black_males <- observed_df_alles_targets_black_males$Value
+
+ 
 ```
 

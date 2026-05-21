@@ -1,0 +1,126 @@
+---
+title: "Meeting_21_05_2026"
+output: github_document
+---
+
+# Recap
+
+- Structural simulation:
+    - Getting unrealistic results in both simple and multiple-controls specifications of structural modelling
+- Max Likelihood:
+    - Getting NA for standard errors of intercept term (fixed)
+
+
+# Progress
+
+- Updated code to run simulation on sample of only black males
+- Incorporated random design and design matrix into estimation
+- Get result that optimal parameter values are the initial values specified??
+    - Potentially stems from misspecified `mbo` code:
+    
+Code currently says:
+
+```{r}
+# library(mlrMBO)
+# library(ParamHelpers)
+# library(parallelMap)
+# 
+# 
+# 
+# # configure Bayesian optimisation
+# mbo_ctrl <- makeMBOControl()
+# mbo_ctrl <- setMBOControlInfill(mbo_ctrl, crit = crit.ei)      # expected improvement
+# mbo_ctrl <- setMBOControlTermination(mbo_ctrl, max.evals = 500L) # iterations
+# 
+# # generate initial values and random design
+# 
+# init_par <- data.frame(
+#     beta_0_educ               = 10,
+#     alpha_educ                = 0.5,
+#     beta_0_income             = 5,
+#     gamma_income              = 0.3,
+#     alpha_income              = 0.2,
+#     u_consc                   = 0,
+#     u_educ                    = 0,
+#     u_income                  = 0
+# )
+# 
+# random_design <- generateRandomDesign(n = 20, par.set = par_set_simple)
+# 
+# design_mat <- rbind(init_par, random_design)
+# 
+# 
+# ctrl <- mlr::makeTuneControlMBO(mbo.control = mbo_ctrl, mbo.design = design_mat)
+# 
+# # run in parallel
+# parallelStartSocket(cpus = parallel::detectCores() - 1)
+# 
+# parallelExport(
+#     "sim_function_reg",
+#     "target_values_simple_black_males",
+#     "weights_vec"
+# )
+# 
+# # also load required packages on each worker
+# parallelLibrary("tidyverse")
+# parallelLibrary("mlrMBO")
+# 
+# set.seed(427292, "L'Ecuyer")
+# result <- mbo(
+#     fun     = obj_fun,
+#     design  = design_mat,
+#     control = mbo_ctrl,
+#     show.info = TRUE
+# )
+# 
+# 
+# parallelStop()
+# 
+# # extract results
+# result$x        # optimal parameter values
+# result$y        # final loss value
+
+```
+
+Code from tutorial 12 looks like this:
+
+```{r}
+# Setup: defining the learning task in mlr
+# regr_task <- mlr::makeRegrTask(
+#   id = "NIDS income regression with elasticnet",
+#   data = df_train_pre_proc, 
+#   target = "log_income_pc"
+#   )
+# 
+# # Setup: Baysesian optimisation control (mlrMBO)
+# measure <- rmse
+# mbo_ctrl <- mlrMBO::makeMBOControl()
+# mbo_ctrl <- mlrMBO::setMBOControlInfill(mbo_ctrl, crit = crit.ei)
+# mbo_ctrl <- mlrMBO::setMBOControlTermination(mbo_ctrl, max.evals = 50L)
+# 
+# # Setup: learner and hyperparameter space
+# regr_lrn <- mlr::makeLearner("regr.glmnet")
+# glmnet_num_ps = ParamHelpers::makeParamSet(
+#   ParamHelpers::makeNumericParam("alpha", lower = 0, upper = 1),
+#   ParamHelpers::makeNumericParam("lambda", lower = 0, upper = 0.1)
+# )
+# 
+# # Tuning execution
+# design_mat <- ParamHelpers::generateRandomDesign(n = 8, par.set = glmnet_num_ps) 
+# ctrl <- mlr::makeTuneControlMBO(mbo.control = mbo_ctrl, mbo.design = design_mat)
+# 
+# set.seed(427292, "L'Ecuyer")
+# # parallelStartSocket(min(6, detectCores() - 1))
+# tune_pars_glmnet <- mlr::tuneParams(
+#   learner = regr_lrn, 
+#   task = regr_task, 
+#   resampling = mlr::makeResampleDesc("CV", iters = 10L),
+#   measures = rmse, 
+#   par.set = glmnet_num_ps, 
+#   control = ctrl, 
+#   show.info = TRUE
+#   )
+# parallelStop()
+
+```
+

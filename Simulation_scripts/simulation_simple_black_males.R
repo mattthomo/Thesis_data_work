@@ -104,7 +104,7 @@ sim_function_reg <- function(par, n, target_coefs, weights){
     bind_cols(sim_results)
 
 
-    observed_moments_df <- readRDS('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/observed_tab.rds')
+    observed_moments_df <- readRDS('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/observed_tab_black_males.rds')
 
     loss_df <- comparison_df %>%
         bind_rows(observed_moments_df) %>%
@@ -174,24 +174,48 @@ result <- optim(
 
 weights_vec <- c(
     # distributional moments - use inverse variance (1/sd^2)
-    mean_loginc  = 1 / sd(test_ols$l_total_inc, na.rm = T)^2,
-    sd_loginc    = 1 / (sd(test_ols$l_total_inc, na.rm = T)^2 / (2 * nrow(test_ols))),
-    mean_educ    = 1 / sd(test_ols$w4_best_edu, na.rm = T)^2,
-    sd_educ      = 1 / (sd(test_ols$w4_best_edu, na.rm = T)^2 / (2 * nrow(test_ols))),
-    mean_consc   = 1 / sd(test_ols$consc_flipped, na.rm = T)^2,
-    sd_consc     = 1 / (sd(test_ols$consc_flipped, na.rm = T)^2 / (2 * nrow(test_ols))),
+    mean_loginc  = 1 / sd(test_ols %>%
+                              filter(w1_best_gen == 1,
+                                     w4_best_race == "African") %>%
+                              pull(l_total_inc), na.rm = T)^2,
+    sd_loginc    = 1 / (sd(test_ols %>%
+                               filter(w1_best_gen == 1,
+                                      w4_best_race == "African") %>%
+                               pull(l_total_inc), na.rm = T)^2 / (2 * nrow(test_ols %>%
+                                                                               filter(w1_best_gen == 1,
+                                                                                      w4_best_race == "African")))),
+    mean_educ    = 1 / sd(test_ols %>%
+                              filter(w1_best_gen == 1,
+                                     w4_best_race == "African") %>%
+                              pull(w4_best_edu), na.rm = T)^2,
+    sd_educ      = 1 / (sd(test_ols %>%
+                               filter(w1_best_gen == 1,
+                                      w4_best_race == "African") %>%
+                               pull(w4_best_edu), na.rm = T)^2 / (2 * nrow(test_ols %>%
+                                                                               filter(w1_best_gen == 1,
+                                                                                      w4_best_race == "African")))),
+    mean_consc   = 1 / sd(test_ols %>%
+                              filter(w1_best_gen == 1,
+                                     w4_best_race == "African") %>%
+                              pull(consc_flipped), na.rm = T)^2,
+    sd_consc     = 1 / (sd(test_ols %>%
+                               filter(w1_best_gen == 1,
+                                      w4_best_race == "African") %>%
+                               pull(consc_flipped), na.rm = T)^2 / (2 * nrow(test_ols %>%
+                                                                               filter(w1_best_gen == 1,
+                                                                                      w4_best_race == "African")))),
 
     # regression coefficients - use inverse SE^2 from observed models
-    educ_reg_Intercept         = 1 / summary(educ_ols_simp)$coefficients["(Intercept)", "Std. Error"]^2,
-    educ_reg_Conscientiousness = 1 / summary(educ_ols_simp)$coefficients["consc_flipped", "Std. Error"]^2,
+    educ_reg_Intercept         = 1 / summary(educ_ols_simp_black_males)$coefficients["(Intercept)", "Std. Error"]^2,
+    educ_reg_Conscientiousness = 1 / summary(educ_ols_simp_black_males)$coefficients["consc_flipped", "Std. Error"]^2,
 
     # r squared - assign low weight since it's a fit statistic not a moment
     educ_reg_r_squared = 0.1,
 
     # income regression coefficients
-    inc_reg_intercept = 1 / summary(sim_ols)$coefficients["(Intercept)", "Std. Error"]^2,
-    inc_reg_educ      = 1 / summary(sim_ols)$coefficients["w4_best_edu",  "Std. Error"]^2,
-    inc_reg_consc     = 1 / summary(sim_ols)$coefficients["consc_flipped","Std. Error"]^2,
+    inc_reg_intercept = 1 / summary(sim_ols_black_males)$coefficients["(Intercept)", "Std. Error"]^2,
+    inc_reg_educ      = 1 / summary(sim_ols_black_males)$coefficients["w4_best_edu",  "Std. Error"]^2,
+    inc_reg_consc     = 1 / summary(sim_ols_black_males)$coefficients["consc_flipped","Std. Error"]^2,
 
     # r squared - low weight
     inc_reg_r_squared = 0.1
@@ -222,7 +246,7 @@ obj_fun <- makeSingleObjectiveFunction(
 
 
         sim_function_reg(par = x, n = 100000,
-                              target_coefs = target_values_simple,
+                              target_coefs = target_values_simple_black_males,
                               weights = weights_vec)
     },
     par.set = par_set_simple,
@@ -289,7 +313,7 @@ parallelStartSocket(cpus = parallel::detectCores() - 1)
 
 parallelExport(
     "sim_function_reg",
-    "target_values_simple",
+    "target_values_simple_black_males",
     "weights_vec"
 )
 
