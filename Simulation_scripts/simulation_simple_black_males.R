@@ -146,30 +146,6 @@ sim_function_reg <- function(par, n, target_coefs, weights){
 
 
 }
-sim_function_reg(par = init_par, n = 100, target_coefs = target_values_simple)
-
-
-init_par <- c(
-    12,       # beta_0_educ
-    1.5,      # alpha_educ
-    20,       # beta_0_income
-    2.0,      # gamma_income
-    1.0,      # alpha_income
-    log(1),   # u_consc SD (exp(0) = 1)
-    log(1),   # u_educ SD
-    log(1)    # u_income SD
-)
-
-## Optimise on moments
-
-result <- optim(
-    par          = init_par,
-    fn           = sim_function_reg,
-    target_coefs = target_values_simple,
-    n            = 100,
-    method       = "Nelder-Mead",
-    weights      = weights_vec
-)
 
 
 weights_vec <- c(
@@ -225,7 +201,7 @@ weights_vec <- weights_vec / sum(weights_vec)
 
 
 ##### Using mlrMBO package #######
-
+### THIS CODE WAS BEFORE USING DESIGNMAT ######
 par_set_simple <- makeParamSet(
     makeNumericParam("beta_0_educ",   lower = 0,  upper = 20),
     makeNumericParam("alpha_educ",    lower = -10,  upper = 10),
