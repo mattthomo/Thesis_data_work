@@ -18,7 +18,7 @@ sim_function_reg <- function(par, n, target_coefs, weights){
 
     library(tidyverse)
 
-    set.seed(123456)
+    #set.seed(123456)
 
 
 
@@ -212,8 +212,8 @@ par_set_simple <- makeParamSet(
     makeNumericParam("u_educ",        lower = -5,   upper = 5),
     makeNumericParam("u_income",      lower = -5,   upper = 5)
 )
-
-# 2. wrap your loss function for mlrMBO
+#
+# # 2. wrap your loss function for mlrMBO
 obj_fun <- makeSingleObjectiveFunction(
     name = "loss",
     fn = function(x) {
@@ -228,25 +228,25 @@ obj_fun <- makeSingleObjectiveFunction(
     par.set = par_set_simple,
     minimize = TRUE
 )
-
-# 3. configure the optimisation
-ctrl <- makeMBOControl()
-ctrl <- setMBOControlTermination(ctrl, iters = 500)  # number of iterations
-
-# 4. run the optimisation
-result_simple <- mbo(obj_fun, control = ctrl)
-
-# 5. extract results
-result_simple$x        # optimal parameter values
-result_simple$y        # final loss value
-
-
-mbo_results_simple <- as.data.frame(result$x) %>%
-    pivot_longer(cols = everything(),
-                 names_to = "Parameter",
-                 values_to = "Value")
-
-write_rds(mbo_results_simple, file = '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/mbo_simple.rds')
+#
+# # 3. configure the optimisation
+# ctrl <- makeMBOControl()
+# ctrl <- setMBOControlTermination(ctrl, iters = 500)  # number of iterations
+#
+# # 4. run the optimisation
+# result_simple <- mbo(obj_fun, control = ctrl)
+#
+# # 5. extract results
+# result_simple$x        # optimal parameter values
+# result_simple$y        # final loss value
+#
+#
+# mbo_results_simple <- as.data.frame(result$x) %>%
+#     pivot_longer(cols = everything(),
+#                  names_to = "Parameter",
+#                  values_to = "Value")
+#
+# write_rds(mbo_results_simple, file = '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/mbo_simple.rds')
 
 
 # After meeting on 27 March, want to work on getting results for structural model which are closer to true estimates
@@ -262,27 +262,26 @@ library(parallelMap)
 # configure Bayesian optimisation
 mbo_ctrl <- makeMBOControl()
 mbo_ctrl <- setMBOControlInfill(mbo_ctrl, crit = crit.ei)      # expected improvement
-mbo_ctrl <- setMBOControlTermination(mbo_ctrl, max.evals = 500L) # iterations
+mbo_ctrl <- setMBOControlTermination(mbo_ctrl, max.evals = 100L) # iterations
 
+## Attempt 1
 # generate initial values and random design
 
 init_par <- data.frame(
-    beta_0_educ               = 10,
-    alpha_educ                = 0.5,
-    beta_0_income             = 5,
-    gamma_income              = 0.3,
-    alpha_income              = 0.2,
-    u_consc                   = 0,
-    u_educ                    = 0,
-    u_income                  = 0
+    beta_0_educ   = 10,
+    alpha_educ    = 0.5,
+    beta_0_income = 5,
+    gamma_income  = 0.3,
+    alpha_income  = 0.2,
+    u_consc       = 0,
+    u_educ        = 0,
+    u_income      = 0
 )
+
 
 random_design <- generateRandomDesign(n = 20, par.set = par_set_simple)
 
-design_mat <- rbind(init_par, random_design)
-
-
-ctrl <- mlr::makeTuneControlMBO(mbo.control = mbo_ctrl, mbo.design = design_mat)
+design_mat <- rbind(best_row, random_design)
 
 # run in parallel
 parallelStartSocket(cpus = parallel::detectCores() - 1)
@@ -339,3 +338,116 @@ print(opt_path)
 # check if y values have any variation
 summary(opt_path$y)
 table(opt_path$y)  # if all same value, loss function is broken
+
+# Evaluate loss for each row of design_mat
+y_vals <- apply(design_mat, 1, function(row) {
+    sim_function_reg(
+        par          = as.numeric(row),
+        n            = 10000,
+        target_coefs = target_values_simple_black_males,
+        weights      = weights_vec
+    )
+})
+
+# Add y column to design_mat
+design_mat$y <- y_vals
+
+# Then pass to mbo
+result <- mbo(
+    fun       = obj_fun,
+    design    = design_mat,
+    control   = mbo_ctrl,
+    show.info = TRUE
+)
+
+result$x
+
+# Check for any NA or type problems introduced by rbind
+str(design_mat)
+anyNA(design_mat)
+
+design_mat <- rbind(init_par, random_design) %>%
+    mutate(across(everything(), as.numeric))
+
+
+#### Design mat diagnosis #####
+
+# 1. Check design_mat looks correct
+str(design_mat)
+head(design_mat)
+anyNA(design_mat)
+
+# 2. Check y values in design_mat actually vary
+summary(design_mat$y)
+
+# 3. Check obj_fun works correctly by calling it directly
+# MBO passes parameters as a named list so replicate that exactly
+test1 <- obj_fun(list(
+    beta_0_educ   = 10,
+    alpha_educ    = 0.5,
+    beta_0_income = 5,
+    gamma_income  = 0.3,
+    alpha_income  = 0.2,
+    u_consc       = 0,
+    u_educ        = 0,
+    u_income      = 0
+))
+
+test2 <- obj_fun(list(
+    beta_0_educ   = 2,
+    alpha_educ    = 2,
+    beta_0_income = 2,
+    gamma_income  = 2,
+    alpha_income  = 2,
+    u_consc       = 1,
+    u_educ        = 1,
+    u_income      = 1
+))
+
+cat("obj_fun test 1:", test1, "\n")
+cat("obj_fun test 2:", test2, "\n")
+cat("Are they the same?", test1 == test2, "\n")
+
+# 4. Check opt.path after mbo run
+opt_path <- as.data.frame(result$opt.path)
+summary(opt_path$y)
+head(opt_path[order(opt_path$y), ], 10)  # top 10 best rows
+
+optim_result <- optim(
+    par     = c(10, 0.5, 5, 0.3, 0.2, 0, 0, 0),  # rough starting guess
+    fn      = function(par) {
+        sim_function_reg(
+            par          = par,
+            n            = 10000,
+            target_coefs = target_values_simple_black_males,
+            weights      = weights_vec
+        )
+    },
+    method  = "Nelder-Mead",
+    control = list(maxit = 1000, reltol = 1e-8)
+)
+
+# Extract the best parameters found
+best_par <- optim_result$par
+print(best_par)
+print(optim_result$value)  # loss at these parameters
+
+init_par <- as.data.frame(t(best_par))
+colnames(init_par) <- c("beta_0_educ", "alpha_educ", "beta_0_income",
+                        "gamma_income", "alpha_income", "u_consc",
+                        "u_educ", "u_income")
+
+
+
+## Attempt 2 with different init vals
+
+init_par <- data.frame(
+    beta_0_educ               = 1,
+    alpha_educ                = 0.2,
+    beta_0_income             = 8,
+    gamma_income              = 0.4,
+    alpha_income              = 0.5,
+    u_consc                   = 1,
+    u_educ                    = 1,
+    u_income                  = 1
+)

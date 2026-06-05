@@ -1,0 +1,27 @@
+---
+title: "Meeting_05_06_2026"
+output: github_document
+---
+
+```{r include=FALSE}
+library(tidyverse)
+```
+
+
+# Progress
+
+- Investigated why I was getting fed back initial values as results from MBO output:   
+    - Seemed that initial values specified were already values which minimised loss  
+- Then ran a separate minimisation function to find initial values which would minimise loss even more:
+
+```{r echo=FALSE}
+
+opt_path1 <- readRDS("/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/optpath1.rds")
+
+opt_path_out <- head(opt_path1[order(opt_path1$y), ], 10) 
+
+opt_path_out %>% 
+    mutate(across(1:8, ~ round(.x, 3))) %>% 
+    select(1:9)
+```
+
