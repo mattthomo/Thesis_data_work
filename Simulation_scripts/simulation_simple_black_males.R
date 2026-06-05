@@ -281,7 +281,7 @@ init_par <- data.frame(
 
 random_design <- generateRandomDesign(n = 20, par.set = par_set_simple)
 
-design_mat <- rbind(best_row, random_design)
+design_mat <- rbind(init_par, random_design)
 
 # run in parallel
 parallelStartSocket(cpus = parallel::detectCores() - 1)
@@ -409,9 +409,19 @@ cat("obj_fun test 2:", test2, "\n")
 cat("Are they the same?", test1 == test2, "\n")
 
 # 4. Check opt.path after mbo run
-opt_path <- as.data.frame(result$opt.path)
+opt_path1 <- as.data.frame(result$opt.path)
+saveRDS(opt_path1, file = "./output/optpath1.rds")
+
+opt_path2 <- as.data.frame(result$opt.path)
+saveRDS(opt_path2, file = "./output/optpath2.rds")
+
+
+opt_path3 <- as.data.frame(result$opt.path)
+saveRDS(opt_path3, file = "./output/optpath3.rds")
+
+
 summary(opt_path$y)
-head(opt_path[order(opt_path$y), ], 10)  # top 10 best rows
+head(opt_path2[order(opt_path2$y), ], 10)  # top 10 best rows
 
 optim_result <- optim(
     par     = c(10, 0.5, 5, 0.3, 0.2, 0, 0, 0),  # rough starting guess
@@ -451,3 +461,4 @@ init_par <- data.frame(
     u_educ                    = 1,
     u_income                  = 1
 )
+

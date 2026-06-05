@@ -12,7 +12,22 @@ library(tidyverse)
 
 - Investigated why I was getting fed back initial values as results from MBO output:   
     - Seemed that initial values specified were already values which minimised loss  
-- Then ran a separate minimisation function to find initial values which would minimise loss even more:
+
+Print optimal path results here for 10 best iterations, in terms of smallest loss values
+Using first set of initial values (Where `y` here corresponds to loss value):
+
+```{r}
+init_par <- data.frame(
+    beta_0_educ   = 10,
+    alpha_educ    = 0.5,
+    beta_0_income = 5,
+    gamma_income  = 0.3,
+    alpha_income  = 0.2,
+    u_consc       = 0,
+    u_educ        = 0,
+    u_income      = 0
+)
+```
 
 ```{r echo=FALSE}
 
@@ -21,6 +36,62 @@ opt_path1 <- readRDS("/Users/matthewthompson/Documents/Stellenbosch University/M
 opt_path_out <- head(opt_path1[order(opt_path1$y), ], 10) 
 
 opt_path_out %>% 
+    mutate(across(1:8, ~ round(.x, 3))) %>% 
+    select(1:9)
+```
+
+Using second set of initial values:
+```{r}
+init_par <- data.frame(
+    beta_0_educ               = 1,
+    alpha_educ                = 0.2,
+    beta_0_income             = 8,
+    gamma_income              = 0.4,
+    alpha_income              = 0.5,
+    u_consc                   = 1,
+    u_educ                    = 1,
+    u_income                  = 1
+)
+```
+
+```{r echo=FALSE}
+opt_path2 <- readRDS("/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/optpath2.rds")
+
+opt_path_out2 <- head(opt_path2[order(opt_path2$y), ], 10) 
+
+opt_path_out2 %>% 
+    mutate(across(1:8, ~ round(.x, 3))) %>% 
+    select(1:9)
+```
+
+
+Then ran an optimisation function to try and generate values which would minimise `y` then fed these into `mbo` as initial values:
+```{r}
+# Minimisation code I ran to get new set of initial values:
+
+# optim_result <- optim(
+#     par     = c(10, 0.5, 5, 0.3, 0.2, 0, 0, 0),  # rough starting guess
+#     fn      = function(par) {
+#         sim_function_reg(
+#             par          = par,
+#             n            = 10000,
+#             target_coefs = target_values_simple_black_males,
+#             weights      = weights_vec
+#         )
+#     },
+#     method  = "Nelder-Mead",
+#     control = list(maxit = 1000, reltol = 1e-8)
+# )
+```
+
+
+
+```{r echo=FALSE}
+opt_path3 <- readRDS("/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/optpath3.rds")
+
+opt_path_out3 <- head(opt_path3[order(opt_path3$y), ], 10) 
+
+opt_path_out3 %>% 
     mutate(across(1:8, ~ round(.x, 3))) %>% 
     select(1:9)
 ```
