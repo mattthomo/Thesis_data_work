@@ -462,3 +462,14 @@ init_par <- data.frame(
     u_income                  = 1
 )
 
+# result of optim function
+init_par <- data.frame(
+    beta_0_educ               = 11.50333,
+    alpha_educ                = -0.02113,
+    beta_0_income             = 6.361638,
+    gamma_income              = 0.084179,
+    alpha_income              = 0.04725592,
+    u_consc                   = -0.4193541,
+    u_educ                    = 1.310216,
+    u_income                  = 0.03502108
+)
