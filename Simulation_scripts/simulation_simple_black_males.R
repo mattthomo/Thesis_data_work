@@ -228,25 +228,6 @@ obj_fun <- makeSingleObjectiveFunction(
     par.set = par_set_simple,
     minimize = TRUE
 )
-#
-# # 3. configure the optimisation
-# ctrl <- makeMBOControl()
-# ctrl <- setMBOControlTermination(ctrl, iters = 500)  # number of iterations
-#
-# # 4. run the optimisation
-# result_simple <- mbo(obj_fun, control = ctrl)
-#
-# # 5. extract results
-# result_simple$x        # optimal parameter values
-# result_simple$y        # final loss value
-#
-#
-# mbo_results_simple <- as.data.frame(result$x) %>%
-#     pivot_longer(cols = everything(),
-#                  names_to = "Parameter",
-#                  values_to = "Value")
-#
-# write_rds(mbo_results_simple, file = '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/mbo_simple.rds')
 
 
 # After meeting on 27 March, want to work on getting results for structural model which are closer to true estimates
@@ -262,7 +243,7 @@ library(parallelMap)
 # configure Bayesian optimisation
 mbo_ctrl <- makeMBOControl()
 mbo_ctrl <- setMBOControlInfill(mbo_ctrl, crit = crit.ei)      # expected improvement
-mbo_ctrl <- setMBOControlTermination(mbo_ctrl, max.evals = 100L) # iterations
+mbo_ctrl <- setMBOControlTermination(mbo_ctrl, iters = 1000, max.evals = 1000L) # iterations
 
 ## Attempt 1
 # generate initial values and random design
@@ -279,7 +260,7 @@ init_par <- data.frame(
 )
 
 
-random_design <- generateRandomDesign(n = 20, par.set = par_set_simple)
+random_design <- generateRandomDesign(n = 50, par.set = par_set_simple)
 
 design_mat <- rbind(init_par, random_design)
 
@@ -366,7 +347,7 @@ result$x
 str(design_mat)
 anyNA(design_mat)
 
-design_mat <- rbind(init_par, random_design) %>%
+design_mat <- rbind(init_par2, init_par3, init_par, random_design) %>%
     mutate(across(everything(), as.numeric))
 
 
@@ -451,7 +432,7 @@ colnames(init_par) <- c("beta_0_educ", "alpha_educ", "beta_0_income",
 
 ## Attempt 2 with different init vals
 
-init_par <- data.frame(
+init_par2 <- data.frame(
     beta_0_educ               = 1,
     alpha_educ                = 0.2,
     beta_0_income             = 8,
@@ -463,7 +444,7 @@ init_par <- data.frame(
 )
 
 # result of optim function
-init_par <- data.frame(
+init_par3 <- data.frame(
     beta_0_educ               = 11.50333,
     alpha_educ                = -0.02113,
     beta_0_income             = 6.361638,
@@ -473,3 +454,21 @@ init_par <- data.frame(
     u_educ                    = 1.310216,
     u_income                  = 0.03502108
 )
+
+
+# Try using a more narrow parameter space
+
+par_set_simple <- makeParamSet(
+    makeNumericParam("beta_0_educ",   lower = 0,  upper = 15),
+    makeNumericParam("alpha_educ",    lower = -5,  upper = 5),
+    makeNumericParam("beta_0_income", lower = 0,  upper = 15),
+    makeNumericParam("gamma_income",  lower = -5,  upper = 5),
+    makeNumericParam("alpha_income",  lower = -5,  upper = 5),
+    makeNumericParam("u_consc",       lower = -5,   upper = 5),
+    makeNumericParam("u_educ",        lower = -5,   upper = 5),
+    makeNumericParam("u_income",      lower = -5,   upper = 5)
+)
+
+
+opdf <- as.data.frame(result$opt.path)  # full history
+plot(opdf$dob, opdf$y)               # convergence plot: iteration vs objective value
