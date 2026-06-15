@@ -259,6 +259,7 @@ random_design <- generateRandomDesign(n = 50, par.set = par_set_simple)
 
 design_mat <- rbind(init_par, random_design)
 
+# create y values to add to design mat
 y_vals <- apply(design_mat, 1, function(row) {
     sim_function_reg(
         par          = as.numeric(row),
