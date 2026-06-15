@@ -361,11 +361,6 @@ table_1 <- tidy(ols1) %>%
 
 write_rds(table_1, "./output/tab1.rds")
 
-
- 
-
-
-
  
  ols2 <- lm(l_total_inc ~ w1_a_consc + w4_best_gen + w4_best_race + l_total_assets_pc,
                   data = joined_w1_w4_best)
@@ -513,8 +508,6 @@ write_rds(test_ols, file = "./output/test_ols.rds")
 
 
 # Simple models
-
-
 
 simple_ols1 <- lm_robust(data = test_ols,
                   w4_employed ~ consc_flipped)
@@ -860,9 +853,6 @@ write_rds(observed_moments_controls_df, file = "./output/observed_moments_contro
 # now want to create df which includes regression coefficients from observed data
 
 
-
-
-
 income_reg_info <- as.data.frame(sim_ols$coefficients) %>% 
     pivot_wider(names_from = "sim_ols$coefficients",
                 values_from = "sim_ols$coefficients") %>% 
@@ -953,12 +943,16 @@ sim_ols_black_males <- lm(l_total_inc ~ w4_best_edu + consc_flipped,
                   filter(w1_best_gen == 1,
                          w4_best_race == "African"))
 
+write_rds(sim_ols_black_males, file = "./output/sim_ols_black_males.rds")
+
 r_square_df1 <- summary(sim_ols_black_males)
 
 educ_ols_simp_black_males <- lm(data = test_ols %>%
                                     filter(w1_best_gen == 1,
                                            w4_best_race == "African"), 
                                 w4_best_edu ~ consc_flipped)
+
+write_rds(educ_ols_simp_black_males, file = "./output/educ_ols_simp_black_males.rds")
 
 r_square_df2 <- summary(educ_ols_simp_black_males)
 
@@ -996,6 +990,7 @@ observed_df_alles_targets_black_males <- observed_df_alles_black_males %>%
 
 target_values_simple_black_males <- observed_df_alles_targets_black_males$Value
 
+write_rds(target_values_simple_black_males, file = "./output/target_black_males.rds")
  
 ```
 
