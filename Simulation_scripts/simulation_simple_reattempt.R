@@ -265,3 +265,82 @@ opdf <- as.data.frame(result$opt.path) %>%
 
 # full history
 plot(opdf$dob, opdf$y)
+
+# This result once again showed that while the optimisation code was run, the optimal values were still the initial parameters provided
+# This prompts the use of the local optimiser to be input as the initial parameters in the global optimising function
+
+optim_result <- optim(
+    par     = init_par,  # rough starting guess
+    fn      = function(par) {
+        sim_function_reg(
+            par          = par,
+            n            = 10000,
+            target_coefs = target_values_simple,
+            weights      = weights_vec
+        )
+    },
+    method  = "Nelder-Mead",
+    control = list(maxit = 1000, reltol = 1e-8)
+)
+
+optim_init_par <- optim_result$par
+
+random_design <- generateRandomDesign(n = 100, par.set = par_set_simple)
+
+design_mat <- rbind(optim_init_par, random_design)
+
+# create y values to add to design mat
+y_vals <- apply(design_mat, 1, function(row) {
+    sim_function_reg(
+        par          = as.numeric(row),
+        n            = 100000,
+        target_coefs = target_values_simple,
+        weights      = weights_vec
+    )
+})
+
+# Add y column to design_mat
+design_mat$y <- y_vals
+
+### Run optimisation ####
+
+# run in parallel
+parallelStartSocket(cpus = parallel::detectCores() - 1)
+
+parallelExport(
+    "sim_function_reg",
+    "target_values_simple",
+    "weights_vec"
+)
+
+# also load required packages on each worker
+parallelLibrary("tidyverse")
+parallelLibrary("mlrMBO")
+
+set.seed(427292, "L'Ecuyer")
+result <- mbo(
+    fun     = obj_fun,
+    design  = design_mat,
+    control = mbo_ctrl,
+    show.info = TRUE
+)
+
+parallelStop()
+
+# extract results
+result$x        # optimal parameter values
+result$y        # final loss value
+
+
+opdf <- as.data.frame(result$opt.path) %>%
+    arrange(y)
+
+# full history
+plot(opdf$dob, opdf$y)
+
+mbo_results_simple <- as.data.frame(result$x) %>%
+    pivot_longer(cols = everything(),
+                 names_to = "Parameter",
+                 values_to = "Value")
+
+write_rds(mbo_results_simple, file = '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/mbo_simple.rds')
