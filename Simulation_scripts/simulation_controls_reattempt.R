@@ -1,4 +1,4 @@
-# This script houses the simulation code for the full model, using the optimisation method found in the simulation_simple_black_males.R
+# This script houses the simulation code for the full sample with controls, using the optimisation method found in the simulation_simple_black_males.R
 
 
 
@@ -190,12 +190,6 @@ sim_function_controls <- function(par, n, target_coefs, weights){
     loss <- sum(weights * ((sim_values - target_values)^2))
 
     return(loss)
-
-    # sim_coefs <- comparison_df$simulated_data
-    #
-    # loss <- sum((sim_coefs - target_coefs)^2)
-    # return(loss)
-
 
 }
 

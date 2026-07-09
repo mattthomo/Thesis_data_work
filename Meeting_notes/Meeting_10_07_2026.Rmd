@@ -5,6 +5,7 @@ output: github_document
 
 ```{r Setup, include=FALSE}
 library(kableExtra)
+library(tidyverse)
 ```
 
 
@@ -16,11 +17,34 @@ library(kableExtra)
 
 # Results
 
+
+
 ```{r echo=FALSE}
 model_with_controls <- readRDS(file = '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/mbo_control.rds')
 
 model_with_controls %>% 
+    mutate(Parameter_meaning = case_when(
+        Parameter == "beta_0_educ"   ~ "Intercept term of educ equation",
+        Parameter == "alpha_educ"    ~ "Consc on educ",        
+        Parameter == "beta_0_educ"   ~ "Intercept term of educ equation",
+        Parameter == "beta_0_income" ~ "Intercept term of income equation",
+        Parameter == "gamma_income"  ~ "Educ on income",
+        Parameter == "alpha_income"  ~ "Consc on income",
+        Parameter == "u_consc"       ~ "Std dev of consc error term",
+        Parameter == "u_educ"        ~ "Std dev of educ equation error term",
+        Parameter == "u_income"      ~ "Std dev of income equation error term",
+        Parameter == "delta_income_white"   ~ "White on income",
+        Parameter == "delta_income_coloured"   ~ "Coloured on income",
+        Parameter == "delta_income_asian"   ~ "Asian on income",
+        Parameter == "delta_income_female"   ~ "Female on income",
+        Parameter == "delta_income_age"   ~ "Age on income",
+        Parameter == "delta_income_age_squared" ~ "Intercept term of educ equation",
+        Parameter == "delta_income_educ_squared" ~ "Intercept term of educ equation",
+        Parameter == "delta_income_wealth" ~ "Wealth on income",
+        TRUE ~ NA_character_
+    )) %>% 
     kable(format = "html",
-          col.names = c("Parameter", "Value"))
+          col.names = c("Parameter", "Value", "Parameter meaning"),
+          caption = "Simulation result on full model with controls")
 ```
 
