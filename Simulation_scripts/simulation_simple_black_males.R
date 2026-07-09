@@ -372,3 +372,53 @@ par_set_simple_narrow <- makeParamSet(
 
 opdf <- as.data.frame(result$opt.path)  # full history
 plot(opdf$dob, opdf$y)               # convergence plot: iteration vs objective value
+
+
+### Want to try removing init_par and seeing what `mlrMBO` produces as optimal values
+
+# create y values to add to design mat
+
+design_mat_no_init_par <- generateRandomDesign(n = 50, par.set = par_set_simple)
+
+y_vals <- apply(design_mat_no_init_par, 1, function(row) {
+    sim_function_reg(
+        par          = as.numeric(row),
+        n            = 10000,
+        target_coefs = target_values_simple_black_males,
+        weights      = weights_vec,
+        observed_moments_df = observed_moments_df
+    )
+})
+
+# add y-column to design mat
+
+design_mat_no_init_par$y <- y_vals
+
+# run in parallel
+parallelStartSocket(cpus = parallel::detectCores() - 1)
+
+parallelExport(
+    "sim_function_reg",
+    "target_values_simple_black_males",
+    "weights_vec",
+    "observed_moments_df"
+)
+
+# also load required packages on each worker
+parallelLibrary("tidyverse")
+parallelLibrary("mlrMBO")
+
+set.seed(427292, "L'Ecuyer")
+result <- mbo(
+    fun     = obj_fun,
+    design  = design_mat_no_init_par,
+    control = mbo_ctrl,
+    show.info = TRUE
+)
+
+
+
+parallelStop()
+
+result$x        # optimal parameter values
+result$y

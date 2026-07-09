@@ -1,5 +1,8 @@
+# This script houses the simulation code for the full model, using the optimisation method found in the simulation_simple_black_males.R
 
-### Create simulation function #####
+
+
+### Simulation Function ###
 
 sim_function_controls <- function(par, n, target_coefs, weights){
 
@@ -114,7 +117,7 @@ sim_function_controls <- function(par, n, target_coefs, weights){
         wealth_sim = wealth_sim
     )
 
-# create df of simulated moments
+    # create df of simulated moments
     simulated_moments_df <- sim_df %>%
         summarise(
             mean_loginc = mean(income, na.rm = T),
@@ -197,33 +200,8 @@ sim_function_controls <- function(par, n, target_coefs, weights){
 }
 
 
-init_par <- c(
-    # education equation
-    10,     # beta_0_educ: intercept (mean years of education)
-    0.5,    # alpha_educ: positive effect of conscientiousness on education
+### Weights vector ###
 
-    # income equation
-    5,      # beta_0_income: intercept
-    0.3,    # gamma_income: positive return to education
-    0.2,    # alpha_income: positive effect of conscientiousness on income
-
-    # error SDs (on log scale because you use exp() inside sim)
-    log(1), # u_consc: SD of conscientiousness error
-    log(1), # u_educ: SD of education error
-    log(1), # u_income: SD of income error
-
-    # race effects on income (relative to black = reference)
-    0.3,    # delta_income_white: white wage premium
-    0.1,    # delta_income_coloured: coloured wage premium
-    0.2,    # delta_income_asian: asian wage premium
-
-    # other controls
-    0.1,    # delta_income_female: gender wage gap
-    0.05,   # delta_income_age: age effect
-    -0.001, # delta_income_age_squared: diminishing age returns
-    -0.01,  # delta_income_educ_squared: diminishing education returns
-    0.2     # delta_income_wealth: wealth effect
-)
 
 weights_vec_controls <- c(
     # distributional moments - use inverse variance (1/sd^2)
@@ -264,21 +242,7 @@ weights_vec_controls <- c(
 
 weights_vec_controls <- weights_vec_controls / sum(weights_vec_controls)
 
-
-
-result <- optim(
-    par          = init_par,
-    fn           = sim_function_controls,
-    target_coefs = target_values_controls,
-    n            = 10000,
-    method       = "Nelder-Mead",
-    weights      = weights_vec_controls
-)
-
-result$par
-
-
-### Using mlrMBO package ######
+### Define parameter space ###
 
 par_set_controls <- makeParamSet(
     makeNumericParam("beta_0_educ",   lower = 0,  upper = 20),
@@ -299,6 +263,10 @@ par_set_controls <- makeParamSet(
     makeNumericParam("delta_income_wealth",   lower = 0, upper = 10)
 )
 
+
+### Wrap objective function ###
+
+
 obj_fun <- makeSingleObjectiveFunction(
     name = "loss",
     fn = function(x) {
@@ -306,7 +274,8 @@ obj_fun <- makeSingleObjectiveFunction(
         x <- as.numeric(x)
 
 
-        sim_function_controls(par = x, n = 50000,
+        sim_function_controls(par = x,
+                              n = 50000,
                               target_coefs = target_values_controls,
                               weights = weights_vec_controls)
     },
@@ -314,19 +283,171 @@ obj_fun <- makeSingleObjectiveFunction(
     minimize = TRUE
 )
 
-# 3. Configure optimisation
+### Configure Bayesian optimisation ###
 
-ctrl <- makeMBOControl()
-ctrl <- setMBOControlTermination(ctrl, iters = 1000)  # number of iterations
+mbo_ctrl <- makeMBOControl()
+mbo_ctrl <- setMBOControlInfill(mbo_ctrl, crit = crit.ei)      # expected improvement
+mbo_ctrl <- setMBOControlTermination(mbo_ctrl, iters = 1000, max.evals = 1000L) # iterations
 
-# 4. run the optimisation
 
-result <- mbo(obj_fun, control = ctrl)
+### Initial values and random design generation ###
 
-# 5. extract results
 
+init_par <- c(
+    # education equation
+    10,     # beta_0_educ: intercept (mean years of education)
+    0.5,    # alpha_educ: positive effect of conscientiousness on education
+
+    # income equation
+    5,      # beta_0_income: intercept
+    0.3,    # gamma_income: positive return to education
+    0.2,    # alpha_income: positive effect of conscientiousness on income
+
+    # error SDs (on log scale because you use exp() inside sim)
+    log(1), # u_consc: SD of conscientiousness error
+    log(1), # u_educ: SD of education error
+    log(1), # u_income: SD of income error
+
+    # race effects on income (relative to black = reference)
+    0.3,    # delta_income_white: white wage premium
+    0.1,    # delta_income_coloured: coloured wage premium
+    0.2,    # delta_income_asian: asian wage premium
+
+    # other controls
+    -0.1,    # delta_income_female: gender wage gap
+    0.05,   # delta_income_age: age effect
+    -0.001, # delta_income_age_squared: diminishing age returns
+    -0.01,  # delta_income_educ_squared: diminishing education returns
+    0.2     # delta_income_wealth: wealth effect
+)
+
+random_design <- generateRandomDesign(n = 100, par.set = par_set_controls)
+
+design_mat <- rbind(init_par, random_design)
+
+# create y values to add to design mat
+y_vals <- apply(design_mat, 1, function(row) {
+    sim_function_controls(
+        par          = as.numeric(row),
+        n            = 100000,
+        target_coefs = target_values_controls,
+        weights      = weights_vec_controls
+    )
+})
+
+# Add y column to design_mat
+design_mat$y <- y_vals
+
+### Run optimisation ###
+
+# run in parallel
+parallelStartSocket(cpus = parallel::detectCores() - 1)
+
+parallelExport(
+    "sim_function_controls",
+    "target_values_controls",
+    "weights_vec_controls"
+)
+
+# also load required packages on each worker
+parallelLibrary("tidyverse")
+parallelLibrary("mlrMBO")
+
+set.seed(427292, "L'Ecuyer")
+result <- mbo(
+    fun     = obj_fun,
+    design  = design_mat,
+    control = mbo_ctrl,
+    show.info = TRUE
+)
+
+parallelStop()
+
+# extract results
 result$x        # optimal parameter values
 result$y        # final loss value
+
+
+opdf <- as.data.frame(result$opt.path) %>%
+    arrange(y)
+    # full history
+plot(opdf$dob, opdf$y)
+
+
+### similar result to what was obtained previously
+### try now with optim function
+
+optim_result <- optim(
+    par     = init_par,  # rough starting guess
+    fn      = function(par) {
+        sim_function_controls(
+            par          = init_par,
+            n            = 10000,
+            target_coefs = target_values_controls,
+            weights      = weights_vec_controls
+        )
+    },
+    method  = "Nelder-Mead",
+    control = list(maxit = 1000, reltol = 1e-8)
+)
+
+opt_result <- optim(
+    par          = init_par,
+    fn           = sim_function_controls,
+    target_coefs = target_values_controls,
+    n            = 100000,
+    method       = "Nelder-Mead",
+    weights      = weights_vec_controls
+)
+
+opt_result$value
+opt_result$par
+
+
+### try simulation again with opt_result values as new initial parameter values
+
+init_par <- opt_result$par
+
+random_design <- generateRandomDesign(n = 100, par.set = par_set_controls)
+
+design_mat <- rbind(init_par, random_design)
+
+# Add y column to design_mat
+design_mat$y <- y_vals
+
+### Run optimisation ###
+
+# run in parallel
+parallelStartSocket(cpus = parallel::detectCores() - 1)
+
+parallelExport(
+    "sim_function_controls",
+    "target_values_controls",
+    "weights_vec_controls"
+)
+
+# also load required packages on each worker
+parallelLibrary("tidyverse")
+parallelLibrary("mlrMBO")
+
+set.seed(427292, "L'Ecuyer")
+result <- mbo(
+    fun     = obj_fun,
+    design  = design_mat,
+    control = mbo_ctrl,
+    show.info = TRUE
+)
+
+parallelStop()
+
+# extract results
+result$x        # optimal parameter values
+result$y        # final loss value
+
+
+opdf <- as.data.frame(result$opt.path)  # full history
+plot(opdf$dob, opdf$y)
+
 
 mbo_results_control <- as.data.frame(result$x) %>%
     pivot_longer(cols = everything(),

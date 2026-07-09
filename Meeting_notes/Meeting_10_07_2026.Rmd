@@ -1,0 +1,26 @@
+---
+title: "Meeting_10_07_2026"
+output: github_document
+---
+
+```{r Setup, include=FALSE}
+library(kableExtra)
+```
+
+
+
+# Recap
+
+- Trying to apply same method of optimisation from reduced sample (only black males) to full sample, and with controls
+
+
+# Results
+
+```{r echo=FALSE}
+model_with_controls <- readRDS(file = '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/mbo_control.rds')
+
+model_with_controls %>% 
+    kable(format = "html",
+          col.names = c("Parameter", "Value"))
+```
+
