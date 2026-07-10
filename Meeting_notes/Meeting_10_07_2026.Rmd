@@ -17,8 +17,8 @@ library(tidyverse)
     1. Nothing fixed with optimisation
     2. Local optimiser found the global min
 
-- In response to this, I removed init_par and found that the parameters were did not minimise loss value as well as local optim function did
-- Below I set out the results of the local optim function which were then parsed into global mbo functions:
+- In response to this, I removed init_par from steps and found that the parameters did not minimise loss value as well as local optim function parameter values did
+- Below I set out the results of the local optim function which were then parsed into global mbo functions, and got the smallest loss values I've found to date:
 
 # Results
 
