@@ -67,8 +67,8 @@ model_with_controls %>%
         Parameter == "delta_income_asian"   ~ "Asian on income",
         Parameter == "delta_income_female"   ~ "Female on income",
         Parameter == "delta_income_age"   ~ "Age on income",
-        Parameter == "delta_income_age_squared" ~ "Intercept term of educ equation",
-        Parameter == "delta_income_educ_squared" ~ "Intercept term of educ equation",
+        Parameter == "delta_income_age_squared" ~ "Age squared on income",
+        Parameter == "delta_income_educ_squared" ~ "Educ squared on income",
         Parameter == "delta_income_wealth" ~ "Wealth on income",
         TRUE ~ NA_character_
     )) %>% 
