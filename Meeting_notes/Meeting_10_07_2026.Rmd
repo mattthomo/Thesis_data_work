@@ -74,11 +74,15 @@ model_with_controls %>%
     )) %>% 
     left_join(model_simple, 
               by = "Parameter") %>% 
-    select(Parameter, Value.y, Value.x) %>% 
+    select(Parameter, Value.y, Value.x, Parameter_meaning.x) %>% 
     mutate(Value.y = ifelse(is.na(Value.y), "", Value.y)) %>% 
     rename("Simple" = "Value.y",
-           "Controls" = "Value.x") %>% 
+           "Controls" = "Value.x",
+           "Parameter meaning" = "Parameter_meaning.x") %>% 
+    mutate(Simple = round(as.numeric(Simple), 4),
+           Controls = round(as.numeric(Controls), 4),
+           Simple = ifelse(is.na(Simple), "", Simple)) %>% 
     kable(format = "html",
-          caption = "Simulation result on full model with controls")
+          caption = "Simulation result on full sample without and with controls")
 ```
 
