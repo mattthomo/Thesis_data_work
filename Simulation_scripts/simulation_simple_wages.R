@@ -1,21 +1,21 @@
-# This script houses the simulation code for the full sample without controls, using the optimisation method found in the simulation_simple_black_males.R
+# This script houses the simulation code for the full sample without controls, using the optimisation method found in the simulation_simple_black_males.R, and for the log of wages outcome
 
 
 ### Simulation function ####
 
 
-sim_function_reg <- function(par, n, target_coefs, weights){
+sim_function_reg_wages <- function(par, n, target_coefs, weights){
 
 
     params <- c(
         beta_0_educ   = par[1],
         alpha_educ    = par[2],
-        beta_0_income = par[3],
-        gamma_income  = par[4],
-        alpha_income  = par[5],
+        beta_0_wages = par[3],
+        gamma_wages  = par[4],
+        alpha_wages  = par[5],
         u_consc       = par[6],
         u_educ        = par[7],
-        u_income      = par[8]
+        u_wages      = par[8]
     )
 
 
@@ -42,7 +42,7 @@ sim_function_reg <- function(par, n, target_coefs, weights){
 
     e_consc  <- rnorm(n, mean = 0, sd = exp(params["u_consc"]))
     e_educ   <- rnorm(n, mean = 0, sd = exp(params["u_educ"]))
-    e_income <- rnorm(n, mean = 0, sd = exp(params["u_income"]))
+    e_wages <- rnorm(n, mean = 0, sd = exp(params["u_wages"]))
 
     consc_measure <-
         consc +
@@ -53,23 +53,23 @@ sim_function_reg <- function(par, n, target_coefs, weights){
         as.numeric(params["alpha_educ"]) * consc_measure +
         e_educ
 
-    income <-
-        as.numeric(params["beta_0_income"]) +
-        as.numeric(params["gamma_income"]) * educ +
-        as.numeric(params["alpha_income"]) * consc_measure +
-        e_income
+    log_wages <-
+        as.numeric(params["beta_0_wages"]) +
+        as.numeric(params["gamma_wages"]) * educ +
+        as.numeric(params["alpha_wages"]) * consc_measure +
+        e_wages
 
 
     sim_df <- data.frame(
         consc        = consc,
         consc_meas   = consc_measure,
         educ         = educ,
-        income       = income
+        log_wages        = log_wages
     )
 
     moments_df <- data.frame(
-        mean_loginc = mean(sim_df$income),
-        sd_loginc = sd(sim_df$income),
+        mean_log_wages = mean(sim_df$log_wages),
+        sd_log_wages = sd(sim_df$log_wages),
         mean_educ = mean(sim_df$educ),
         sd_educ = sd(sim_df$educ),
         mean_consc = mean(sim_df$consc_meas),
@@ -79,7 +79,7 @@ sim_function_reg <- function(par, n, target_coefs, weights){
     lm1 <- lm(educ ~ consc_measure,
               data = sim_df)
 
-    lm2 <- lm(income ~ educ + consc_measure,
+    lm2 <- lm(log_wages ~ educ + consc_measure,
               data = sim_df)
 
     lm1_summary <- summary(lm1)
@@ -108,7 +108,7 @@ sim_function_reg <- function(par, n, target_coefs, weights){
         bind_cols(sim_results)
 
 
-    observed_moments_df <- readRDS('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/observed_tab.rds')
+    observed_moments_df <- readRDS('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/observed_tab_wages.rds')
 
     loss_df <- comparison_df %>%
         bind_rows(observed_moments_df) %>%
@@ -117,7 +117,7 @@ sim_function_reg <- function(par, n, target_coefs, weights){
                      names_to = "Parameter",
                      values_to = "Value")  %>%  # new column gets made with all the names and is called "Parameter"
         pivot_wider(names_from = source,
-                    values_from = Value) # gets simmulated and observed data next to each other
+                    values_from = Value) # gets simulated and observed data next to each other
 
     loss_df
 
@@ -136,12 +136,12 @@ sim_function_reg <- function(par, n, target_coefs, weights){
 
 weights_vec <- c(
     # distributional moments - use inverse variance (1/sd^2)
-    mean_loginc  = 1 / sd(test_ols$l_total_inc, na.rm = T)^2,
-    sd_loginc    = 1 / (sd(test_ols$l_total_inc, na.rm = T)^2 / (2 * nrow(test_ols))),
-    mean_educ    = 1 / sd(test_ols$w4_best_edu, na.rm = T)^2,
-    sd_educ      = 1 / (sd(test_ols$w4_best_edu, na.rm = T)^2 / (2 * nrow(test_ols))),
-    mean_consc   = 1 / sd(test_ols$consc_flipped, na.rm = T)^2,
-    sd_consc     = 1 / (sd(test_ols$consc_flipped, na.rm = T)^2 / (2 * nrow(test_ols))),
+    mean_log_wages  = 1 / sd(test_ols_wages$l_w4_wages, na.rm = T)^2,
+    sd_log_wages    = 1 / (sd(test_ols_wages$l_w4_wages, na.rm = T)^2 / (2 * nrow(test_ols_wages))),
+    mean_educ    = 1 / sd(test_ols_wages$w4_best_edu, na.rm = T)^2,
+    sd_educ      = 1 / (sd(test_ols_wages$w4_best_edu, na.rm = T)^2 / (2 * nrow(test_ols_wages))),
+    mean_consc   = 1 / sd(test_ols_wages$consc_flipped, na.rm = T)^2,
+    sd_consc     = 1 / (sd(test_ols_wages$consc_flipped, na.rm = T)^2 / (2 * nrow(test_ols_wages))),
 
     # regression coefficients - use inverse SE^2 from observed models
     educ_reg_Intercept         = 1 / summary(educ_ols_simp)$coefficients["(Intercept)", "Std. Error"]^2,
@@ -151,9 +151,9 @@ weights_vec <- c(
     educ_reg_r_squared = 0.1,
 
     # income regression coefficients
-    inc_reg_intercept = 1 / summary(sim_ols)$coefficients["(Intercept)", "Std. Error"]^2,
-    inc_reg_educ      = 1 / summary(sim_ols)$coefficients["w4_best_edu",  "Std. Error"]^2,
-    inc_reg_consc     = 1 / summary(sim_ols)$coefficients["consc_flipped","Std. Error"]^2,
+    inc_reg_intercept = 1 / summary(sim_ols_wages)$coefficients["(Intercept)", "Std. Error"]^2,
+    inc_reg_educ      = 1 / summary(sim_ols_wages)$coefficients["w4_best_edu",  "Std. Error"]^2,
+    inc_reg_consc     = 1 / summary(sim_ols_wages)$coefficients["consc_flipped","Std. Error"]^2,
 
     # r squared - low weight
     inc_reg_r_squared = 0.1
@@ -167,12 +167,12 @@ weights_vec <- weights_vec / sum(weights_vec)
 par_set_simple <- makeParamSet(
     makeNumericParam("beta_0_educ",   lower = 0,  upper = 20),
     makeNumericParam("alpha_educ",    lower = -10,  upper = 10),
-    makeNumericParam("beta_0_income", lower = 0,  upper = 20),
-    makeNumericParam("gamma_income",  lower = -10,  upper = 10),
-    makeNumericParam("alpha_income",  lower = -10,  upper = 10),
+    makeNumericParam("beta_0_wages", lower = 0,  upper = 20),
+    makeNumericParam("gamma_wages",  lower = -10,  upper = 10),
+    makeNumericParam("alpha_wages",  lower = -10,  upper = 10),
     makeNumericParam("u_consc",       lower = -5,   upper = 5),
     makeNumericParam("u_educ",        lower = -5,   upper = 5),
-    makeNumericParam("u_income",      lower = -5,   upper = 5)
+    makeNumericParam("u_wages",      lower = -5,   upper = 5)
 )
 
 ### Wrap objective function ####
@@ -185,9 +185,10 @@ obj_fun <- makeSingleObjectiveFunction(
         x <- as.numeric(x)
 
 
-        sim_function_reg(par = x, n = 100000,
-                         target_coefs = target_values_simple,
-                         weights = weights_vec)
+        sim_function_reg_wages(par = x,
+                               n = 100000,
+                               target_coefs = target_values_simple_wages,
+                               weights = weights_vec)
     },
     par.set = par_set_simple,
     minimize = TRUE
@@ -205,12 +206,12 @@ mbo_ctrl <- setMBOControlTermination(mbo_ctrl, iters = 1000, max.evals = 1000L) 
 init_par <- c(
     12,       # beta_0_educ
     0.5,      # alpha_educ
-    5,       # beta_0_income
-    0.3,      # gamma_income
-    0.2,      # alpha_income
+    5,       # beta_0_wages
+    0.3,      # gamma_wages
+    0.2,      # alpha_wages
     log(1),   # u_consc SD (exp(0) = 1)
     log(1),   # u_educ SD
-    log(1)    # u_income SD
+    log(1)    # u_wages SD
 )
 
 random_design <- generateRandomDesign(n = 100, par.set = par_set_simple)
@@ -219,10 +220,10 @@ design_mat <- rbind(init_par, random_design)
 
 # create y values to add to design mat
 y_vals <- apply(design_mat, 1, function(row) {
-    sim_function_reg(
+    sim_function_reg_wages(
         par          = as.numeric(row),
         n            = 100000,
-        target_coefs = target_values_simple,
+        target_coefs = target_values_simple_wages,
         weights      = weights_vec
     )
 })
@@ -236,8 +237,8 @@ design_mat$y <- y_vals
 parallelStartSocket(cpus = parallel::detectCores() - 1)
 
 parallelExport(
-    "sim_function_reg",
-    "target_values_simple",
+    "sim_function_reg_wages",
+    "target_values_simple_wages",
     "weights_vec"
 )
 
@@ -272,10 +273,10 @@ plot(opdf$dob, opdf$y)
 optim_result <- optim(
     par     = init_par,  # rough starting guess
     fn      = function(par) {
-        sim_function_reg(
+        sim_function_reg_wages(
             par          = par,
             n            = 10000,
-            target_coefs = target_values_simple,
+            target_coefs = target_values_simple_wages,
             weights      = weights_vec
         )
     },
@@ -291,10 +292,10 @@ design_mat <- rbind(optim_init_par, random_design)
 
 # create y values to add to design mat
 y_vals <- apply(design_mat, 1, function(row) {
-    sim_function_reg(
+    sim_function_reg_wages(
         par          = as.numeric(row),
         n            = 100000,
-        target_coefs = target_values_simple,
+        target_coefs = target_values_simple_wages,
         weights      = weights_vec
     )
 })
@@ -308,8 +309,8 @@ design_mat$y <- y_vals
 parallelStartSocket(cpus = parallel::detectCores() - 1)
 
 parallelExport(
-    "sim_function_reg",
-    "target_values_simple",
+    "sim_function_reg_wages",
+    "target_values_simple_wages",
     "weights_vec"
 )
 
@@ -338,43 +339,45 @@ opdf <- as.data.frame(result$opt.path) %>%
 # full history
 plot(opdf$dob, opdf$y)
 
-mbo_results_simple <- as.data.frame(result$x) %>%
+mbo_results_simple_wages <- as.data.frame(result$x) %>%
     pivot_longer(cols = everything(),
                  names_to = "Parameter",
                  values_to = "Value")
 
-write_rds(mbo_results_simple, file = '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/mbo_simple.rds')
+# save optimisation results
+
+write_rds(mbo_results_simple_wages, file = '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/mbo_simple_wages.rds')
 
 
 ## get SE results from bootstrapping
 
-mbo_results_simple <- readRDS(file = '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/mbo_simple.rds')
+mbo_results_simple_wages <- readRDS(file = '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/mbo_simple_wages.rds') # in cases where session was closed and don't want to redo simulations
 
 n_boots <- 500
 boot_params <- matrix(NA, nrow = n_boots, ncol = 8)
 colnames(boot_params) <- c(
-    "beta_0_educ", "alpha_educ", "beta_0_income",
-    "gamma_income", "alpha_income",
-    "u_consc", "u_educ", "u_income"
+    "beta_0_educ", "alpha_educ", "beta_0_wages",
+    "gamma_wages", "alpha_wages",
+    "u_consc", "u_educ", "u_wages"
 )
 
 # use optimal parameters from mbo as starting point
-optimal_par <- as.numeric(unlist(mbo_results_simple$Value))
+optimal_par <- as.numeric(unlist(mbo_results_simple_wages$Value))
 
 for (i in 1:n_boots) {
 
     # resample true data with replacement
-    boot_df <- test_ols[sample(nrow(test_ols), replace = TRUE), ]
+    boot_df <- test_ols_wages[sample(nrow(test_ols_wages), replace = TRUE), ]
 
     # recompute target moments from bootstrapped data
     boot_lm1 <- lm(w4_best_edu ~ consc_flipped, data = boot_df)
-    boot_lm2 <- lm(l_total_inc ~ w4_best_edu + consc_flipped,
+    boot_lm2 <- lm(l_w4_wages ~ w4_best_edu + consc_flipped,
                    data = boot_df)
 
     # recompute bootstrap target moments (means, SDs, coefficients)
     boot_target <- c(
-        mean(boot_df$l_total_inc,        na.rm = TRUE),
-        sd(boot_df$l_total_inc,          na.rm = TRUE),
+        mean(boot_df$l_w4_wages,        na.rm = TRUE),
+        sd(boot_df$l_w4_wages,          na.rm = TRUE),
         mean(boot_df$w4_best_edu,        na.rm = TRUE),
         sd(boot_df$w4_best_edu,          na.rm = TRUE),
         mean(boot_df$consc_flipped,      na.rm = TRUE),
@@ -386,7 +389,7 @@ for (i in 1:n_boots) {
     # rerun optim from optimal mbo values
     boot_result <- optim(
         par          = optimal_par,
-        fn           = sim_function_reg,
+        fn           = sim_function_reg_wages,
         n            = 10000,           # smaller n for speed
         target_coefs = boot_target,
         weights      = weights_vec,
@@ -414,13 +417,13 @@ boot_cov <- cov(boot_params)
 # x6 = u_consc, x7 = u_educ, x8 = u_income
 se_u_consc  <- deltamethod(~ exp(x6), mean = boot_means, cov = boot_cov)
 se_u_educ   <- deltamethod(~ exp(x7), mean = boot_means, cov = boot_cov)
-se_u_income <- deltamethod(~ exp(x8), mean = boot_means, cov = boot_cov)
+se_u_wages <- deltamethod(~ exp(x8), mean = boot_means, cov = boot_cov)
 
 results_final_simple <- data.frame(
     parameter = c(
-        "beta_0_educ", "alpha_educ", "beta_0_income",
-        "gamma_income", "alpha_income",
-        "u_consc", "u_educ", "u_income"
+        "beta_0_educ", "alpha_educ", "beta_0_wages",
+        "gamma_wages", "alpha_wages",
+        "u_consc", "u_educ", "u_wages"
     ),
     estimate = c(
         optimal_par[1:5],
@@ -432,7 +435,7 @@ results_final_simple <- data.frame(
         boot_se[1:5],           # direct bootstrap SEs
         se_u_consc,             # delta method SEs for transformed params
         se_u_educ,
-        se_u_income
+        se_u_wages
     )
 ) %>%
     mutate(
@@ -459,7 +462,7 @@ results_final_simple <- data.frame(
         Type = factor(Type, levels = c("Estimate", "se"))
     ) %>%
     fill(parameter, .direction = "down") %>%
-    mutate(is_error_sd = parameter %in% c("u_consc", "u_educ", "u_income")) %>%
+    mutate(is_error_sd = parameter %in% c("u_consc", "u_educ", "u_wages")) %>%
     filter(!(row %in% c(6,7,8) & is_error_sd == FALSE)) %>%
     mutate(order = ifelse(is_error_sd, 1, 0)) %>%
     arrange(order, row) %>%
@@ -470,4 +473,5 @@ print(results_final_simple)
 
 # save results
 write_rds(results_final_simple,
-          '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/simple_results_with_se.rds')
+          '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/simple_results_with_se_wages.rds')
+

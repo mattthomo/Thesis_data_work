@@ -502,7 +502,9 @@ ols_df <- ols_df %>%
 ```{r}
 
 test_ols <- ols_df %>% 
-    mutate(consc_flipped = w1_consc_imput * -1) # flipped conscientiousness measure after examining PCA loadings and directions
+    mutate(consc_flipped = w1_consc_imput * -1) %>% # flipped conscientiousness measure after examining PCA loadings and directions
+    left_join(y = w4_best %>% select(pid, w4_best_age_yrs), by = "pid") %>% 
+    mutate(w4_age_squared = w4_best_age_yrs^2)
 
 write_rds(test_ols, file = "./output/test_ols.rds")
 
@@ -680,7 +682,29 @@ result_ml <- maxLik(ll,
 ))
 
 result_ml$code
-ml_table <- as.data.frame(summary(result_ml)$estimate)
+
+ml_table <- as.data.frame(coef(summary(result_ml))) %>%
+  rownames_to_column("parameter") %>%
+  mutate(
+    stars = case_when(
+      `Pr(> t)` < 0.01  ~ "$^{***}$",
+      `Pr(> t)` < 0.05  ~ "$^{**}$",
+      `Pr(> t)` < 0.1   ~ "$^{*}$",
+      TRUE              ~ ""
+    ),
+    Estimate     = paste0(round(Estimate, 3), stars),
+    se_formatted = paste0("(", round(`Std. error`, 3), ")")
+  ) %>%
+  select(parameter, Estimate, se_formatted) %>%
+  pivot_longer(
+    cols      = c(Estimate, se_formatted),
+    names_to  = "type",
+    values_to = "value"
+  ) %>%
+  mutate(
+    parameter = ifelse(type == "se_formatted", "", parameter)
+  ) %>%
+  select(-type)
 
 write_rds(ml_table, file = "./output/ml_tab.rds")
 
@@ -992,5 +1016,481 @@ target_values_simple_black_males <- observed_df_alles_targets_black_males$Value
 
 write_rds(target_values_simple_black_males, file = "./output/target_black_males.rds")
  
+```
+
+
+# Earnings analysis
+
+This section does the exact same analysis as before, but now with wages to show robustness of results to different income specifications.
+
+## OLS
+
+```{r}
+# Wages already exists in test_ols data
+# Just need to log it
+
+test_ols_wages <- test_ols %>% 
+    mutate(l_w4_wages = log(w4_a_em1pay)) %>% 
+    mutate(l_w4_wages = ifelse(l_w4_wages == "-Inf", NA, l_w4_wages))
+
+
+simple_ols1_wages <- lm(data = test_ols_wages,
+                  l_w4_wages ~ consc_flipped)
+
+
+# Adding controls of educ squared, age and age squared
+
+
+control1_wages <- lm(data = test_ols_wages,
+               l_w4_wages ~ consc_flipped + w4_best_edu + w4_educ_squared + w1_age + age_sq)
+
+
+# add gender and race
+
+
+control2_wages <- lm(data = test_ols_wages,
+               l_w4_wages ~ consc_flipped + w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race)
+
+
+# add wealth
+
+
+control3_wages <- lm(data = test_ols_wages,
+               l_w4_wages ~ consc_flipped + w4_best_edu + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd)
+
+stargazer::stargazer(simple_ols1_wages, control1_wages, control2_wages, control3_wages, type = "text")
+
+```
+
+
+## Simulation work
+
+Copied code from when doing the analysis on log of total income, and changed outcome to wages variable
+
+```{r}
+# first want to create row vector of important moments in observed df
+
+observed_moments_df_wages <- test_ols_wages %>%
+    summarise(
+        mean_log_wages = mean(l_w4_wages, na.rm = T),
+        sd_log_wages = sd(l_w4_wages, na.rm = T),
+        mean_educ = mean(w4_best_edu, na.rm = T),
+        sd_educ = sd(w4_best_edu, na.rm = T),
+        mean_consc = mean(consc_flipped, na.rm = T),
+        sd_consc = sd(consc_flipped, na.rm = T)
+    )
+
+# run wages regression that will be matched in simulation
+sim_ols_wages <- lm(l_w4_wages ~ w4_best_edu + consc_flipped,
+              data = test_ols_wages)
+
+# extract R-squared from wages regression
+r_square_df1_wages <- summary(sim_ols_wages)
+
+# extract R-squared from educ regression
+r_square_df2_wages <- summary(educ_ols_simp)
+
+# create df of coefficient values from education regression to be matched in simulation
+observed_coefficients_df_wages <- as.data.frame(educ_ols_simp$coefficients) %>% 
+    pivot_wider(names_from = "educ_ols_simp$coefficients",
+                values_from = "educ_ols_simp$coefficients") %>% 
+    rename("educ_reg_Intercept" = 1,
+           "educ_reg_Conscientiousness" = 2) %>% 
+    mutate(educ_reg_r_squared = r_square_df2_wages$r.squared)
+
+# run regression of wages, but now with controls
+sim_ols_controls_wages <- lm(data = test_ols_wages,
+               l_w4_wages ~ w4_best_edu + consc_flipped + w4_educ_squared + w1_age + age_sq + w4_best_gen + w4_best_race + wealth_index_famd)
+
+# extract R-squared for model
+r_square_3_wages <- summary(sim_ols_controls_wages)
+
+# extract coefficients from wages regression with controls
+observed_coef_control_df_wages <- as.data.frame(sim_ols_controls_wages$coefficients) %>% 
+    pivot_wider(names_from = "sim_ols_controls_wages$coefficients",
+                values_from = "sim_ols_controls_wages$coefficients") %>% 
+    rename("inc_reg_intercept" = 1,
+           "inc_reg_educ" = 2,
+           "inc_reg_consc" = 3,
+           "inc_reg_educ_squared" = 4,
+           "inc_reg_age" = 5,
+           "inc_reg_age_sq" = 6,
+           "inc_reg_female" = 7,
+           "inc_reg_coloured" = 8,
+           "inc_reg_asian" = 9,
+           "inc_reg_white" = 10,
+           "inc_reg_wealth" = 11) %>% 
+    mutate(inc_reg_r_squared = r_square_3_wages$r.squared)
+
+# create df of moments of variables to be matched in simulation, and bind with regression coefficients
+observed_moments_controls_df_wages <- test_ols_wages %>%
+    summarise(
+        mean_log_wages = mean(l_w4_wages, na.rm = T),
+        sd_log_wages = sd(l_w4_wages, na.rm = T),
+        mean_educ = mean(w4_best_edu, na.rm = T),
+        sd_educ = sd(w4_best_edu, na.rm = T),
+        mean_consc = mean(consc_flipped, na.rm = T),
+        sd_consc = sd(consc_flipped, na.rm = T),
+        mean_age = mean(w1_age, na.rm = T),
+        sd_age = sd(w1_age, na.rm = T),
+        mean_wealth = mean(wealth_index_famd, na.rm = T),
+        sd_wealth = sd(wealth_index_famd, na.rm = T)
+    ) %>% 
+    cbind(observed_coefficients_df_wages, observed_coef_control_df_wages)
+
+# save df as objects which will be read into the simulation scripts
+write_rds(observed_moments_df_wages, file = "./output/observed_moments_wages.rds")
+write_rds(observed_moments_controls_df_wages, file = "./output/observed_moments_controls_wages.rds")
+
+# now want to create df which includes regression coefficients and r-squared from observed data
+income_reg_info_wages <- as.data.frame(sim_ols_wages$coefficients) %>% 
+    pivot_wider(names_from = "sim_ols_wages$coefficients",
+                values_from = "sim_ols_wages$coefficients") %>% 
+    rename("inc_reg_intercept" = 1,
+           "inc_reg_educ" = 2,
+           "inc_reg_consc" = 3) %>% 
+    mutate(inc_reg_r_squared = r_square_df1_wages$r.squared)
+
+# bind dfs of the educ regression and wages regression without controls
+observed_df_alles_wages <- observed_moments_df_wages %>% 
+    cbind(observed_coefficients_df_wages, income_reg_info_wages)
+
+# save df as object to be read into simulation script (for simple model)
+write_rds(observed_df_alles_wages, file = "./output/observed_tab_wages.rds")
+
+# get df into longer format
+observed_df_alles_targets_wages <- observed_df_alles_wages %>% 
+    pivot_longer(cols = everything(),
+                 names_to = "Parameter",
+                 values_to = "Value")
+
+# create object of target values to be used in simulation script for simple model
+target_values_simple_wages <- observed_df_alles_targets_wages$Value
+
+# get df for model with controls into longer format
+observed_df_alles_targets_controls_wages <- observed_moments_controls_df_wages %>% 
+    pivot_longer(cols = everything(),
+                 names_to = "Parameter",
+                 values_to = "Value")
+
+# create object of target values to be used in simulation script for simple model
+target_values_controls_wages <- observed_df_alles_targets_controls_wages$Value
+
+# extract std errors from regressions to be used in the weights of simulation
+std_errors_full_ols_wages <- as.data.frame(summary(sim_ols_controls_wages)$coefficients[, "Std. Error"])  %>% 
+    rename("Std_error" = 1) %>% 
+    mutate(weights = 1/ (Std_error^2)) %>% 
+    mutate(weights_scaled = weights/sum(weights)) %>% 
+    rownames_to_column(var = "parameter") %>% 
+    mutate(parameter = case_when(
+    parameter == "(Intercept)"            ~ "beta_0_income",
+    parameter == "w4_best_edu"            ~ "gamma_income",
+    parameter == "consc_flipped"          ~ "alpha_income",
+    parameter == "w4_best_raceWhite"      ~ "delta_income_white",
+    parameter == "w4_best_raceColoured"   ~ "delta_income_coloured",
+    parameter == "w4_best_raceAsian/Indian" ~ "delta_income_asian",
+    parameter == "w4_best_genFemale"      ~ "delta_income_female",
+    parameter == "w1_age"                 ~ "delta_income_age",
+    parameter == "age_sq"                 ~ "delta_income_age_squared",
+    parameter == "w4_educ_squared"        ~ "delta_income_educ_squared",
+    parameter == "wealth_index_famd"      ~ "delta_income_wealth"
+  ))
+
+# extract weights for simulation
+weights_controls_wages <- std_errors_full_ols_wages$weights_scaled
+
+# extract proportion of races and genders
+race_props_wages <- prop.table(table(test_ols_wages$w4_best_race))
+gender_props_wages <- prop.table(table(test_ols_wages$w4_best_gen))
+
+# include proportions for race and gender into df of regression coefficients
+observed_coef_control_df_wages <- c(
+    observed_coef_control_df_wages,
+    prop_coloured = race_props["Coloured"],
+    prop_white = race_props["White"],
+    prop_asian = race_props["Asian/Indian"],
+    prop_female = gender_props["Female"]
+)
+
+# bind regression coefficients for both simple and control models to moments data
+observed_df_alles2_wages <- observed_moments_df_wages %>% 
+    cbind(observed_coefficients_df_wages, observed_coef_control_df_wages)
+
+# save df
+write_rds(observed_df_alles2_wages, file = "./output/observed_tab2_wages.rds")
+```
+
+
+# Re-do table formatting for paper
+
+Having completed the simulation estimation, the formatting of results now needs to be finalised. This section of code seeks to create dfs to be parsed into the paper markdown in the required format. That is each outcome variable needs its own OLS without conscientiousness, then one with consc., followed by the structural estimation results
+
+## Wages and conscientiousness table
+
+```{r}
+
+# no conscientiousness
+## no controls
+wages_tab_ols_1 <- lm(l_w4_wages ~ w4_best_edu,
+                  data = test_ols_wages)
+
+## add controls
+wages_tab_ols_2 <- lm(l_w4_wages ~ w4_best_edu + w4_best_age_yrs + wealth_index_famd + w4_best_gen + w4_best_race,
+                  data = test_ols_wages)
+
+## add quadratics
+wages_tab_ols_3 <- lm(l_w4_wages ~ w4_best_edu + w4_educ_squared + w4_best_age_yrs + w4_age_squared + wealth_index_famd + w4_best_gen + w4_best_race,
+                  data = test_ols_wages)
+
+# add conscientiousness
+## no controls
+wages_tab_ols_4 <- lm(l_w4_wages ~ w4_best_edu + consc_flipped,
+                  data = test_ols_wages)
+
+## add controls
+wages_tab_ols_5 <- lm(l_w4_wages ~ w4_best_edu + consc_flipped + w4_best_age_yrs + wealth_index_famd + w4_best_gen + w4_best_race,
+                  data = test_ols_wages)
+
+## add quadratics
+wages_tab_ols_6 <- lm(l_w4_wages ~ w4_best_edu + w4_educ_squared + consc_flipped + w4_best_age_yrs + w4_age_squared + wealth_index_famd + w4_best_gen + w4_best_race,
+                  data = test_ols_wages)
+
+wages_ols_models <- list(wages_tab_ols_1, wages_tab_ols_2, wages_tab_ols_3, wages_tab_ols_4, wages_tab_ols_5, wages_tab_ols_6)
+
+create_df_for_table(results = wages_ols_models, 
+                    path = "./output/wages_ols_tab.rds")
+
+wages_tab <- read_rds(file = "./output/wages_ols_tab.rds")
+
+wages_tab_reordered <- wages_tab %>%
+  slice(c(3, 4, 17, 18, 21, 22, 5, 6, 19, 20, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 1, 2, 23, 24, 25)) %>% 
+    mutate(term = case_when(
+        row_number() == 2 ~ "educ_se",
+        row_number() == 6 ~ "consc_se",
+        row_number() == 4 ~ "educ_squared_se",
+        row_number() == 8 ~ "age_se",
+        row_number() == 10 ~ "age_squared_se",
+        row_number() == 12 ~ "wealth_se",
+        row_number() == 14 ~ "female_se",
+        row_number() == 16 ~ "coloured_se",
+        row_number() == 18 ~ "asian_se",
+        row_number() == 20 ~ "white_se",
+        row_number() == 22 ~ "intercept_se",
+        TRUE ~ term
+    ))
+
+sim_wages_simple <- read_rds("./output/simple_results_with_se_wages.rds") %>% 
+    slice(c(5:10)) %>% 
+    mutate(parameter = case_when(
+        str_detect(parameter, "beta") ~ "(Intercept)",
+        str_detect(parameter, "gamma") ~ "w4_best_edu",
+        str_detect(parameter, "alpha") ~ "consc_flipped",
+        row_number() == 2 ~ "intercept_se",
+        row_number() == 4 ~ "educ_se",
+        row_number() == 6 ~ "consc_se",
+        TRUE ~ parameter
+    )) %>% 
+    rename("term" = "parameter")
+
+sim_wages_controls <- read_rds("./output/results_with_se_wages.rds") %>% 
+    slice(5:26) %>% 
+    mutate(parameter = case_when(
+        str_detect(parameter, "beta") ~ "(Intercept)",
+        str_detect(parameter, "gamma") ~ "w4_best_edu",
+        str_detect(parameter, "alpha") ~ "consc_flipped",
+        str_detect(parameter, "white") ~ "w4_best_raceWhite",
+        str_detect(parameter, "coloured") ~ "w4_best_raceColoured",
+        str_detect(parameter, "asian") ~ "w4_best_raceAsian/Indian",
+        str_detect(parameter, "age_squared") ~ "w4_age_squared",
+        str_detect(parameter, "educ_squared") ~ "w4_educ_squared",
+        str_detect(parameter, "wealth") ~ "wealth_index_famd",
+        str_detect(parameter, "female") ~ "w4_best_genFemale",
+        str_detect(parameter, "age") ~ "w4_best_age_yrs",
+        row_number() == 2 ~ "intercept_se",
+        row_number() == 6 ~ "consc_se",
+        row_number() == 4 ~ "educ_se",
+        row_number() == 8 ~ "white_se",
+        row_number() == 10 ~ "coloured_se",
+        row_number() == 12 ~ "asian_se",
+        row_number() == 14 ~ "female_se",
+        row_number() == 16 ~ "age_se",
+        row_number() == 18 ~ "age_squared_se",
+        row_number() == 20 ~ "educ_squared_se",
+        row_number() == 22 ~ "wealth_se",
+        TRUE ~ parameter
+    )) %>% 
+    rename("term" = "parameter")
+
+wages_table_paper <- wages_tab_reordered %>% 
+    left_join(y = sim_wages_simple,
+              by = "term") %>% 
+    rename("Model_7" = "Value") %>% 
+    left_join(y = sim_wages_controls,
+              by = "term") %>% 
+    rename("Model_8" = "Value") %>% 
+      mutate(term = case_when(
+        str_detect(term, "(Intercept)") ~ "Constant",
+        str_detect(term, "w4_best_edu") ~ "Education",
+        str_detect(term, "consc_flipped") ~ "Conscientiousness",
+        str_detect(term, "w4_best_raceWhite") ~ "White",
+        str_detect(term, "w4_best_raceColoured") ~ "Coloured",
+        str_detect(term, "w4_best_raceAsian/Indian") ~ "Asian/Indian",
+        str_detect(term, "w4_age_squared") ~ "Age$^{2}$",
+        str_detect(term, "w4_educ_squared") ~ "Education$^{2}$",
+        str_detect(term, "wealth_index_famd") ~ "Wealth",
+        str_detect(term, "w4_best_genFemale") ~ "Female",
+        str_detect(term, "w4_best_age_yrs") ~ "Age",
+        row_number() == 2 ~ "",
+        row_number() == 6 ~ "",
+        row_number() == 4 ~ "",
+        row_number() == 8 ~ "",
+        row_number() == 10 ~ "",
+        row_number() == 12 ~ "",
+        row_number() == 14 ~ "",
+        row_number() == 16 ~ "",
+        row_number() == 18 ~ "",
+        row_number() == 20 ~ "",
+        row_number() == 22 ~ "",
+        TRUE ~ term
+    )) %>% 
+    mutate(across(everything(), ~ replace_na(as.character(.x), "")))
+
+write_rds(wages_table_paper,
+          file = "./output/wages_table_for_paper.rds")
+```
+
+
+## Total income and conscientiousness table
+
+```{r}
+# no conscientiousness
+## no controls
+inc_tab_ols_1 <- lm(l_total_inc ~ w4_best_edu,
+                  data = test_ols)
+
+## add controls
+inc_tab_ols_2 <- lm(l_total_inc ~ w4_best_edu + w4_best_age_yrs + wealth_index_famd + w4_best_gen + w4_best_race,
+                  data = test_ols)
+
+## add quadratics
+inc_tab_ols_3 <- lm(l_total_inc ~ w4_best_edu + w4_educ_squared + w4_best_age_yrs + w4_age_squared + wealth_index_famd + w4_best_gen + w4_best_race,
+                  data = test_ols)
+
+# add conscientiousness
+## no controls
+inc_tab_ols_4 <- lm(l_total_inc ~ w4_best_edu + consc_flipped,
+                  data = test_ols)
+
+## add controls
+inc_tab_ols_5 <- lm(l_total_inc ~ w4_best_edu + consc_flipped + w4_best_age_yrs + wealth_index_famd + w4_best_gen + w4_best_race,
+                  data = test_ols)
+
+## add quadratics
+inc_tab_ols_6 <- lm(l_total_inc ~ w4_best_edu + w4_educ_squared + consc_flipped + w4_best_age_yrs + w4_age_squared + wealth_index_famd + w4_best_gen + w4_best_race,
+                  data = test_ols)
+
+inc_ols_models <- list(inc_tab_ols_1, inc_tab_ols_2, inc_tab_ols_3, inc_tab_ols_4, inc_tab_ols_5, inc_tab_ols_6)
+
+create_df_for_table(results = inc_ols_models, 
+                    path = "./output/inc_ols_tab.rds")
+
+inc_tab <- read_rds(file = "./output/inc_ols_tab.rds")
+
+inc_tab_reordered <- inc_tab %>%
+  slice(c(3, 4, 17, 18, 21, 22, 5, 6, 19, 20, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 1, 2, 23, 24, 25)) %>% 
+    mutate(term = case_when(
+        row_number() == 2 ~ "educ_se",
+        row_number() == 6 ~ "consc_se",
+        row_number() == 4 ~ "educ_squared_se",
+        row_number() == 8 ~ "age_se",
+        row_number() == 10 ~ "age_squared_se",
+        row_number() == 12 ~ "wealth_se",
+        row_number() == 14 ~ "female_se",
+        row_number() == 16 ~ "coloured_se",
+        row_number() == 18 ~ "asian_se",
+        row_number() == 20 ~ "white_se",
+        row_number() == 22 ~ "intercept_se",
+        TRUE ~ term
+    ))
+
+
+sim_inc_simple <- read_rds("./output/simple_results_with_se.rds") %>% 
+    slice(c(5:10)) %>% 
+    mutate(parameter = case_when(
+        str_detect(parameter, "beta") ~ "(Intercept)",
+        str_detect(parameter, "gamma") ~ "w4_best_edu",
+        str_detect(parameter, "alpha") ~ "consc_flipped",
+        row_number() == 2 ~ "intercept_se",
+        row_number() == 4 ~ "educ_se",
+        row_number() == 6 ~ "consc_se",
+        TRUE ~ parameter
+    )) %>% 
+    rename("term" = "parameter")
+
+sim_inc_controls <- read_rds("./output/results_with_se.rds") %>% 
+    slice(5:26) %>% 
+    mutate(parameter = case_when(
+        str_detect(parameter, "beta") ~ "(Intercept)",
+        str_detect(parameter, "gamma") ~ "w4_best_edu",
+        str_detect(parameter, "alpha") ~ "consc_flipped",
+        str_detect(parameter, "white") ~ "w4_best_raceWhite",
+        str_detect(parameter, "coloured") ~ "w4_best_raceColoured",
+        str_detect(parameter, "asian") ~ "w4_best_raceAsian/Indian",
+        str_detect(parameter, "age_squared") ~ "w4_age_squared",
+        str_detect(parameter, "educ_squared") ~ "w4_educ_squared",
+        str_detect(parameter, "wealth") ~ "wealth_index_famd",
+        str_detect(parameter, "female") ~ "w4_best_genFemale",
+        str_detect(parameter, "age") ~ "w4_best_age_yrs",
+        row_number() == 2 ~ "intercept_se",
+        row_number() == 6 ~ "consc_se",
+        row_number() == 4 ~ "educ_se",
+        row_number() == 8 ~ "white_se",
+        row_number() == 10 ~ "coloured_se",
+        row_number() == 12 ~ "asian_se",
+        row_number() == 14 ~ "female_se",
+        row_number() == 16 ~ "age_se",
+        row_number() == 18 ~ "age_squared_se",
+        row_number() == 20 ~ "educ_squared_se",
+        row_number() == 22 ~ "wealth_se",
+        TRUE ~ parameter
+    )) %>% 
+    rename("term" = "parameter")
+
+inc_table_paper <- inc_tab_reordered %>% 
+    left_join(y = sim_inc_simple,
+              by = "term") %>% 
+    rename("Model_7" = "Value") %>% 
+    left_join(y = sim_inc_controls,
+              by = "term") %>% 
+    rename("Model_8" = "Value") %>% 
+      mutate(term = case_when(
+        str_detect(term, "(Intercept)") ~ "Constant",
+        str_detect(term, "w4_best_edu") ~ "Education",
+        str_detect(term, "consc_flipped") ~ "Conscientiousness",
+        str_detect(term, "w4_best_raceWhite") ~ "White",
+        str_detect(term, "w4_best_raceColoured") ~ "Coloured",
+        str_detect(term, "w4_best_raceAsian/Indian") ~ "Asian/Indian",
+        str_detect(term, "w4_age_squared") ~ "Age$^{2}$",
+        str_detect(term, "w4_educ_squared") ~ "Education$^{2}$",
+        str_detect(term, "wealth_index_famd") ~ "Wealth",
+        str_detect(term, "w4_best_genFemale") ~ "Female",
+        str_detect(term, "w4_best_age_yrs") ~ "Age",
+        row_number() == 2 ~ "",
+        row_number() == 6 ~ "",
+        row_number() == 4 ~ "",
+        row_number() == 8 ~ "",
+        row_number() == 10 ~ "",
+        row_number() == 12 ~ "",
+        row_number() == 14 ~ "",
+        row_number() == 16 ~ "",
+        row_number() == 18 ~ "",
+        row_number() == 20 ~ "",
+        row_number() == 22 ~ "",
+        TRUE ~ term
+    )) %>% 
+    mutate(across(everything(), ~ replace_na(as.character(.x), "")))
+
+write_rds(inc_table_paper,
+          file = "./output/inc_table_for_paper.rds")
 ```
 

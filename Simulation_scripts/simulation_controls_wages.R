@@ -1,29 +1,29 @@
-# This script houses the simulation code for the full sample with controls, using the optimisation method found in the simulation_simple_black_males.R
+# This script houses the simulation code for the full sample with controls, using the optimisation method found in the simulation_simple_black_males.R, for the outcome with log wages
 
 
 
 ### Simulation Function ###
 
-sim_function_controls <- function(par, n, target_coefs, weights){
+sim_function_controls_wages <- function(par, n, target_coefs, weights){
 
 
     params <- c(
         beta_0_educ            = par[1],
         alpha_educ             = par[2],
-        beta_0_income          = par[3],
-        gamma_income           = par[4],
-        alpha_income           = par[5],
+        beta_0_wages          = par[3],
+        gamma_wages           = par[4],
+        alpha_wages           = par[5],
         u_consc                = par[6],
         u_educ                 = par[7],
-        u_income               = par[8],
-        delta_income_white     = par[9],
-        delta_income_coloured  = par[10],
-        delta_income_asian     = par[11],
-        delta_income_female    = par[12],
-        delta_income_age       = par[13],
-        delta_income_age_squared = par[14],
-        delta_income_educ_squared = par[15],
-        delta_income_wealth    = par[16]
+        u_wages               = par[8],
+        delta_wages_white     = par[9],
+        delta_wages_coloured  = par[10],
+        delta_wages_asian     = par[11],
+        delta_wages_female    = par[12],
+        delta_wages_age       = par[13],
+        delta_wages_age_squared = par[14],
+        delta_wages_educ_squared = par[15],
+        delta_wages_wealth    = par[16]
     )
 
 
@@ -79,7 +79,7 @@ sim_function_controls <- function(par, n, target_coefs, weights){
 
     e_consc  <- rnorm(n, mean = 0, sd = exp(params["u_consc"]))
     e_educ   <- rnorm(n, mean = 0, sd = exp(params["u_educ"]))
-    e_income <- rnorm(n, mean = 0, sd = exp(params["u_income"]))
+    e_wages <- rnorm(n, mean = 0, sd = exp(params["u_wages"]))
 
     consc_measure <- consc + e_consc # Conscientiousness PCA is noisy measure of conscientiousness
 
@@ -87,26 +87,26 @@ sim_function_controls <- function(par, n, target_coefs, weights){
     educ   <- as.numeric(params["beta_0_educ"]) + as.numeric(params["alpha_educ"]) * consc_measure + e_educ # educ varies by level of conscientiousness
 
 
-    income <-
-        as.numeric(params["beta_0_income"]) +
-        as.numeric(params["gamma_income"]) * educ +
-        as.numeric(params["alpha_income"]) * consc_measure +
-        as.numeric(params["delta_income_educ_squared"]) * educ^2 +
-        as.numeric(params["delta_income_age"]) * age +
-        as.numeric(params["delta_income_age_squared"]) * age^2 +
-        as.numeric(params["delta_income_coloured"]) * race_coloured +
-        as.numeric(params["delta_income_asian"]) * race_asian +
-        as.numeric(params["delta_income_white"]) * race_white +
-        as.numeric(params["delta_income_female"]) * gender_female +
-        as.numeric(params["delta_income_wealth"]) * wealth_sim +
-        e_income # wage equation
+    log_wages <-
+        as.numeric(params["beta_0_wages"]) +
+        as.numeric(params["gamma_wages"]) * educ +
+        as.numeric(params["alpha_wages"]) * consc_measure +
+        as.numeric(params["delta_wages_educ_squared"]) * educ^2 +
+        as.numeric(params["delta_wages_age"]) * age +
+        as.numeric(params["delta_wages_age_squared"]) * age^2 +
+        as.numeric(params["delta_wages_coloured"]) * race_coloured +
+        as.numeric(params["delta_wages_asian"]) * race_asian +
+        as.numeric(params["delta_wages_white"]) * race_white +
+        as.numeric(params["delta_wages_female"]) * gender_female +
+        as.numeric(params["delta_wages_wealth"]) * wealth_sim +
+        e_wages # wage equation
 
 
     sim_df <- data.frame(
         consc        = consc,
         consc_meas   = consc_measure,
         educ         = educ,
-        income       = income,
+        log_wages       = log_wages,
         age          = age,
         race_coloured = race_coloured,
         race_asian = race_asian,
@@ -120,8 +120,8 @@ sim_function_controls <- function(par, n, target_coefs, weights){
     # create df of simulated moments
     simulated_moments_df <- sim_df %>%
         summarise(
-            mean_loginc = mean(income, na.rm = T),
-            sd_loginc = sd(income, na.rm = T),
+            mean_log_wages = mean(log_wages, na.rm = T),
+            sd_log_wages = sd(log_wages, na.rm = T),
             mean_educ = mean(educ, na.rm = T),
             sd_educ = sd(educ, na.rm = T),
             mean_consc = mean(consc, na.rm = T),
@@ -137,7 +137,7 @@ sim_function_controls <- function(par, n, target_coefs, weights){
     lm1 <- lm(educ ~ consc_measure,
               data = sim_df)
 
-    lm2 <- lm(income ~ educ + consc_measure + educ_squared + age + age_squared + gender_female + race_coloured + race_asian + race_white + wealth_sim,
+    lm2 <- lm(log_wages ~ educ + consc_measure + educ_squared + age + age_squared + gender_female + race_coloured + race_asian + race_white + wealth_sim,
               data = sim_df)
 
     lm1_summary <- summary(lm1)
@@ -169,7 +169,7 @@ sim_function_controls <- function(par, n, target_coefs, weights){
         cbind(reg_results1, reg_results2)
 
 
-    observed_moments_df <- readRDS('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/observed_moments_controls.rds') # call in the df with the target values of the observed moments and coefficients
+    observed_moments_df <- readRDS('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/observed_moments_controls_wages.rds') # call in the df with the target values of the observed moments and coefficients
 
 
     loss_df <- sim_results %>%
@@ -199,16 +199,16 @@ sim_function_controls <- function(par, n, target_coefs, weights){
 
 weights_vec_controls <- c(
     # distributional moments - use inverse variance (1/sd^2)
-    mean_loginc  = 1 / sd(test_ols$l_total_inc, na.rm = T)^2,
-    sd_loginc    = 1 / (sd(test_ols$l_total_inc, na.rm = T)^2 / (2 * nrow(test_ols))),
-    mean_educ    = 1 / sd(test_ols$w4_best_edu, na.rm = T)^2,
-    sd_educ      = 1 / (sd(test_ols$w4_best_edu, na.rm = T)^2 / (2 * nrow(test_ols))),
-    mean_consc   = 1 / sd(test_ols$consc_flipped, na.rm = T)^2,
-    sd_consc     = 1 / (sd(test_ols$consc_flipped, na.rm = T)^2 / (2 * nrow(test_ols))),
-    mean_age     = 1 / sd(test_ols$w1_age, na.rm = T)^2,
-    sd_age       = 1 / (sd(test_ols$w1_age, na.rm = T)^2 / (2 * nrow(test_ols))),
-    mean_wealth  = 1 / sd(test_ols$wealth_index_famd, na.rm = T)^2,
-    sd_wealth    = 1 / (sd(test_ols$wealth_index_famd, na.rm = T)^2 / (2 * nrow(test_ols))),
+    mean_log_wages  = 1 / sd(test_ols_wages$l_w4_wages, na.rm = T)^2,
+    sd_log_wages    = 1 / (sd(test_ols_wages$l_w4_wages, na.rm = T)^2 / (2 * nrow(test_ols_wages))),
+    mean_educ    = 1 / sd(test_ols_wages$w4_best_edu, na.rm = T)^2,
+    sd_educ      = 1 / (sd(test_ols_wages$w4_best_edu, na.rm = T)^2 / (2 * nrow(test_ols_wages))),
+    mean_consc   = 1 / sd(test_ols_wages$consc_flipped, na.rm = T)^2,
+    sd_consc     = 1 / (sd(test_ols_wages$consc_flipped, na.rm = T)^2 / (2 * nrow(test_ols_wages))),
+    mean_age     = 1 / sd(test_ols_wages$w1_age, na.rm = T)^2,
+    sd_age       = 1 / (sd(test_ols_wages$w1_age, na.rm = T)^2 / (2 * nrow(test_ols_wages))),
+    mean_wealth  = 1 / sd(test_ols_wages$wealth_index_famd, na.rm = T)^2,
+    sd_wealth    = 1 / (sd(test_ols_wages$wealth_index_famd, na.rm = T)^2 / (2 * nrow(test_ols_wages))),
 
     # regression coefficients - use inverse SE^2 from observed models
     educ_reg_Intercept         = 1 / summary(educ_ols_simp)$coefficients["(Intercept)", "Std. Error"]^2,
@@ -217,18 +217,18 @@ weights_vec_controls <- c(
     # r squared - assign low weight since it's a fit statistic not a moment
     educ_reg_r_squared = 0.025,
 
-    # income regression coefficients
-    inc_reg_intercept = 1 / summary(sim_ols_controls)$coefficients["(Intercept)", "Std. Error"]^2,
-    inc_reg_educ      = 1 / summary(sim_ols_controls)$coefficients["w4_best_edu",  "Std. Error"]^2,
-    inc_reg_consc     = 1 / summary(sim_ols_controls)$coefficients["consc_flipped","Std. Error"]^2,
-    inc_reg_educ_squared     = 1 / summary(sim_ols_controls)$coefficients["w4_educ_squared","Std. Error"]^2,
-    inc_reg_age     = 1 / summary(sim_ols_controls)$coefficients["w1_age","Std. Error"]^2,
-    inc_reg_age_sq     = 1 / summary(sim_ols_controls)$coefficients["age_sq","Std. Error"]^2,
-    inc_reg_female     = 1 / summary(sim_ols_controls)$coefficients["w4_best_genFemale","Std. Error"]^2,
-    inc_reg_coloured     = 1 / summary(sim_ols_controls)$coefficients["w4_best_raceColoured","Std. Error"]^2,
-    inc_reg_asian     = 1 / summary(sim_ols_controls)$coefficients["w4_best_raceAsian/Indian","Std. Error"]^2,
-    inc_reg_white    = 1 / summary(sim_ols_controls)$coefficients["w4_best_raceWhite","Std. Error"]^2,
-    inc_reg_wealth     = 1 / summary(sim_ols_controls)$coefficients["wealth_index_famd","Std. Error"]^2,
+    # wages regression coefficients
+    inc_reg_intercept = 1 / summary(sim_ols_controls_wages)$coefficients["(Intercept)", "Std. Error"]^2,
+    inc_reg_educ      = 1 / summary(sim_ols_controls_wages)$coefficients["w4_best_edu",  "Std. Error"]^2,
+    inc_reg_consc     = 1 / summary(sim_ols_controls_wages)$coefficients["consc_flipped","Std. Error"]^2,
+    inc_reg_educ_squared     = 1 / summary(sim_ols_controls_wages)$coefficients["w4_educ_squared","Std. Error"]^2,
+    inc_reg_age     = 1 / summary(sim_ols_controls_wages)$coefficients["w1_age","Std. Error"]^2,
+    inc_reg_age_sq     = 1 / summary(sim_ols_controls_wages)$coefficients["age_sq","Std. Error"]^2,
+    inc_reg_female     = 1 / summary(sim_ols_controls_wages)$coefficients["w4_best_genFemale","Std. Error"]^2,
+    inc_reg_coloured     = 1 / summary(sim_ols_controls_wages)$coefficients["w4_best_raceColoured","Std. Error"]^2,
+    inc_reg_asian     = 1 / summary(sim_ols_controls_wages)$coefficients["w4_best_raceAsian/Indian","Std. Error"]^2,
+    inc_reg_white    = 1 / summary(sim_ols_controls_wages)$coefficients["w4_best_raceWhite","Std. Error"]^2,
+    inc_reg_wealth     = 1 / summary(sim_ols_controls_wages)$coefficients["wealth_index_famd","Std. Error"]^2,
 
     # r squared - low weight
     inc_reg_r_squared = 0.025
@@ -241,20 +241,20 @@ weights_vec_controls <- weights_vec_controls / sum(weights_vec_controls)
 par_set_controls <- makeParamSet(
     makeNumericParam("beta_0_educ",   lower = 0,  upper = 20),
     makeNumericParam("alpha_educ",    lower = 0,  upper = 10),
-    makeNumericParam("beta_0_income", lower = -10,  upper = 20),
-    makeNumericParam("gamma_income",  lower = 0,  upper = 10),
-    makeNumericParam("alpha_income",  lower = 0,  upper = 10),
+    makeNumericParam("beta_0_wages", lower = -10,  upper = 20),
+    makeNumericParam("gamma_wages",  lower = 0,  upper = 10),
+    makeNumericParam("alpha_wages",  lower = 0,  upper = 10),
     makeNumericParam("u_consc",       lower = -5,   upper = 5),
     makeNumericParam("u_educ",        lower = -5,   upper = 5),
-    makeNumericParam("u_income",      lower = -5,   upper = 5),
-    makeNumericParam("delta_income_white",   lower = 0, upper = 10),
-    makeNumericParam("delta_income_coloured",   lower = -5, upper = 10),
-    makeNumericParam("delta_income_asian",   lower = -5, upper = 10),
-    makeNumericParam("delta_income_female",   lower = -5, upper = 0),
-    makeNumericParam("delta_income_age",   lower = -5, upper = 10),
-    makeNumericParam("delta_income_age_squared",   lower = -5, upper = 0),
-    makeNumericParam("delta_income_educ_squared",   lower = -5, upper = 0),
-    makeNumericParam("delta_income_wealth",   lower = 0, upper = 10)
+    makeNumericParam("u_wages",      lower = -5,   upper = 5),
+    makeNumericParam("delta_wages_white",   lower = 0, upper = 10),
+    makeNumericParam("delta_wages_coloured",   lower = -5, upper = 10),
+    makeNumericParam("delta_wages_asian",   lower = -5, upper = 10),
+    makeNumericParam("delta_wages_female",   lower = -5, upper = 0),
+    makeNumericParam("delta_wages_age",   lower = -5, upper = 10),
+    makeNumericParam("delta_wages_age_squared",   lower = -5, upper = 0),
+    makeNumericParam("delta_wages_educ_squared",   lower = -5, upper = 0),
+    makeNumericParam("delta_wages_wealth",   lower = 0, upper = 10)
 )
 
 
@@ -268,9 +268,9 @@ obj_fun <- makeSingleObjectiveFunction(
         x <- as.numeric(x)
 
 
-        sim_function_controls(par = x,
+        sim_function_controls_wages(par = x,
                               n = 50000,
-                              target_coefs = target_values_controls,
+                              target_coefs = target_values_controls_wages,
                               weights = weights_vec_controls)
     },
     par.set = par_set_controls,
@@ -292,27 +292,27 @@ init_par <- c(
     10,     # beta_0_educ: intercept (mean years of education)
     0.5,    # alpha_educ: positive effect of conscientiousness on education
 
-    # income equation
-    5,      # beta_0_income: intercept
-    0.3,    # gamma_income: positive return to education
-    0.2,    # alpha_income: positive effect of conscientiousness on income
+    # wages equation
+    5,      # beta_0_wages: intercept
+    0.3,    # gamma_wages: positive return to education
+    0.2,    # alpha_wages: positive effect of conscientiousness on wages
 
     # error SDs (on log scale because you use exp() inside sim)
     log(1), # u_consc: SD of conscientiousness error
     log(1), # u_educ: SD of education error
-    log(1), # u_income: SD of income error
+    log(1), # u_wages: SD of wages error
 
-    # race effects on income (relative to black = reference)
-    0.3,    # delta_income_white: white wage premium
-    0.1,    # delta_income_coloured: coloured wage premium
-    0.2,    # delta_income_asian: asian wage premium
+    # race effects on wages (relative to black = reference)
+    0.3,    # delta_wages_white: white wage premium
+    0.1,    # delta_wages_coloured: coloured wage premium
+    0.2,    # delta_wages_asian: asian wage premium
 
     # other controls
-    -0.1,    # delta_income_female: gender wage gap
-    0.05,   # delta_income_age: age effect
-    -0.001, # delta_income_age_squared: diminishing age returns
-    -0.01,  # delta_income_educ_squared: diminishing education returns
-    0.2     # delta_income_wealth: wealth effect
+    -0.1,    # delta_wages_female: gender wage gap
+    0.05,   # delta_wages_age: age effect
+    -0.001, # delta_wages_age_squared: diminishing age returns
+    -0.01,  # delta_wages_educ_squared: diminishing education returns
+    0.2     # delta_wages_wealth: wealth effect
 )
 
 random_design <- generateRandomDesign(n = 100, par.set = par_set_controls)
@@ -321,10 +321,10 @@ design_mat <- rbind(init_par, random_design)
 
 # create y values to add to design mat
 y_vals <- apply(design_mat, 1, function(row) {
-    sim_function_controls(
+    sim_function_controls_wages(
         par          = as.numeric(row),
         n            = 100000,
-        target_coefs = target_values_controls,
+        target_coefs = target_values_controls_wages,
         weights      = weights_vec_controls
     )
 })
@@ -338,8 +338,8 @@ design_mat$y <- y_vals
 parallelStartSocket(cpus = parallel::detectCores() - 1)
 
 parallelExport(
-    "sim_function_controls",
-    "target_values_controls",
+    "sim_function_controls_wages",
+    "target_values_controls_wages",
     "weights_vec_controls"
 )
 
@@ -364,7 +364,7 @@ result$y        # final loss value
 
 opdf <- as.data.frame(result$opt.path) %>%
     arrange(y)
-    # full history
+# full history
 plot(opdf$dob, opdf$y)
 
 
@@ -374,10 +374,10 @@ plot(opdf$dob, opdf$y)
 optim_result <- optim(
     par     = init_par,  # rough starting guess
     fn      = function(par) {
-        sim_function_controls(
-            par          = init_par,
+        sim_function_controls_wages(
+            par          = par,
             n            = 10000,
-            target_coefs = target_values_controls,
+            target_coefs = target_values_controls_wages,
             weights      = weights_vec_controls
         )
     },
@@ -385,22 +385,14 @@ optim_result <- optim(
     control = list(maxit = 1000, reltol = 1e-8)
 )
 
-opt_result <- optim(
-    par          = init_par,
-    fn           = sim_function_controls,
-    target_coefs = target_values_controls,
-    n            = 100000,
-    method       = "Nelder-Mead",
-    weights      = weights_vec_controls
-)
 
-opt_result$value
-opt_result$par
+optim_result$value
+optim_result$par
 
 
 ### try simulation again with opt_result values as new initial parameter values
 
-init_par <- opt_result$par
+init_par <- optim_result$par
 
 random_design <- generateRandomDesign(n = 100, par.set = par_set_controls)
 
@@ -415,8 +407,8 @@ design_mat$y <- y_vals
 parallelStartSocket(cpus = parallel::detectCores() - 1)
 
 parallelExport(
-    "sim_function_controls",
-    "target_values_controls",
+    "sim_function_controls_wages",
+    "target_values_controls_wages",
     "weights_vec_controls"
 )
 
@@ -448,9 +440,9 @@ mbo_results_control <- as.data.frame(result$x) %>%
                  names_to = "Parameter",
                  values_to = "Value")
 
-write_rds(mbo_results_control, file = '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/mbo_control.rds')
+write_rds(mbo_results_control, file = '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/mbo_control_wages.rds')
 
-mbo_results_control <- readRDS(file = '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/mbo_control.rds')
+mbo_results_control <- readRDS(file = '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/mbo_control_wages.rds')
 
 ## Get standard errors through bootstrapping ##
 
@@ -459,12 +451,12 @@ mbo_results_control <- readRDS(file = '/Users/matthewthompson/Documents/Stellenb
 n_boots <- 500
 boot_params <- matrix(NA, nrow = n_boots, ncol = 16)
 colnames(boot_params) <- c(
-    "beta_0_educ", "alpha_educ", "beta_0_income",
-    "gamma_income", "alpha_income",
-    "u_consc", "u_educ", "u_income",
-    "delta_income_white", "delta_income_coloured", "delta_income_asian",
-    "delta_income_female", "delta_income_age", "delta_income_age_squared",
-    "delta_income_educ_squared", "delta_income_wealth"
+    "beta_0_educ", "alpha_educ", "beta_0_wages",
+    "gamma_wages", "alpha_wages",
+    "u_consc", "u_educ", "u_wages",
+    "delta_wages_white", "delta_wages_coloured", "delta_wages_asian",
+    "delta_wages_female", "delta_wages_age", "delta_wages_age_squared",
+    "delta_wages_educ_squared", "delta_wages_wealth"
 )
 
 # use optimal parameters from mbo as starting point
@@ -473,19 +465,19 @@ optimal_par <- as.numeric(unlist(mbo_results_control$Value))
 for (i in 1:n_boots) {
 
     # resample true data with replacement
-    boot_df <- test_ols[sample(nrow(test_ols), replace = TRUE), ]
+    boot_df <- test_ols_wages[sample(nrow(test_ols_wages), replace = TRUE), ]
 
     # recompute target moments from bootstrapped data
     boot_lm1 <- lm(w4_best_edu ~ consc_flipped, data = boot_df)
-    boot_lm2 <- lm(l_total_inc ~ w4_best_edu + consc_flipped + w4_educ_squared +
+    boot_lm2 <- lm(l_w4_wages ~ w4_best_edu + consc_flipped + w4_educ_squared +
                        w1_age + age_sq + gender_female + race_coloured +
                        race_asian + race_white + wealth_index_famd,
                    data = boot_df)
 
     # recompute bootstrap target moments (means, SDs, coefficients)
     boot_target <- c(
-        mean(boot_df$l_total_inc,        na.rm = TRUE),
-        sd(boot_df$l_total_inc,          na.rm = TRUE),
+        mean(boot_df$l_w4_wages,        na.rm = TRUE),
+        sd(boot_df$l_w4_wages,          na.rm = TRUE),
         mean(boot_df$w4_best_edu,        na.rm = TRUE),
         sd(boot_df$w4_best_edu,          na.rm = TRUE),
         mean(boot_df$consc_flipped,      na.rm = TRUE),
@@ -501,7 +493,7 @@ for (i in 1:n_boots) {
     # rerun optim from optimal mbo values
     boot_result <- optim(
         par          = optimal_par,
-        fn           = sim_function_controls,
+        fn           = sim_function_controls_wages,
         n            = 10000,           # smaller n for speed
         target_coefs = boot_target,
         weights      = weights_vec_controls,
@@ -526,19 +518,19 @@ boot_cov <- cov(boot_params)
 
 # delta method for each error SD
 # g(x) = exp(x), so SE(exp(x)) = exp(x) * SE(x)
-# x6 = u_consc, x7 = u_educ, x8 = u_income
+# x6 = u_consc, x7 = u_educ, x8 = u_wages
 se_u_consc  <- deltamethod(~ exp(x6), mean = boot_means, cov = boot_cov)
 se_u_educ   <- deltamethod(~ exp(x7), mean = boot_means, cov = boot_cov)
-se_u_income <- deltamethod(~ exp(x8), mean = boot_means, cov = boot_cov)
+se_u_wages <- deltamethod(~ exp(x8), mean = boot_means, cov = boot_cov)
 
 results_final_controls <- data.frame(
     parameter = c(
-        "beta_0_educ", "alpha_educ", "beta_0_income",
-        "gamma_income", "alpha_income",
-        "u_consc", "u_educ", "u_income",
-        "delta_income_white", "delta_income_coloured", "delta_income_asian",
-        "delta_income_female", "delta_income_age", "delta_income_age_squared",
-        "delta_income_educ_squared", "delta_income_wealth"
+        "beta_0_educ", "alpha_educ", "beta_0_wages",
+        "gamma_wages", "alpha_wages",
+        "u_consc", "u_educ", "u_wages",
+        "delta_wages_white", "delta_wages_coloured", "delta_wages_asian",
+        "delta_wages_female", "delta_wages_age", "delta_wages_age_squared",
+        "delta_wages_educ_squared", "delta_wages_wealth"
     ),
     estimate = c(
         optimal_par[1:5],
@@ -551,7 +543,7 @@ results_final_controls <- data.frame(
         boot_se[1:5],           # direct bootstrap SEs
         se_u_consc,             # delta method SEs for transformed params
         se_u_educ,
-        se_u_income,
+        se_u_wages,
         boot_se[9:16]           # direct bootstrap SEs
     )
 ) %>%
@@ -581,7 +573,7 @@ results_final_controls <- data.frame(
     ) %>%
     fill(parameter, .direction = "down") %>%
     # flag which rows are error SD parameters
-    mutate(is_error_sd = parameter %in% c("u_consc", "u_educ", "u_income")) %>%
+    mutate(is_error_sd = parameter %in% c("u_consc", "u_educ", "u_wages")) %>%
     # remove SE rows for error SD parameters
     filter(!(row %in% c(6,7,8) & is_error_sd == FALSE)) %>%
     # push error SD rows to bottom
@@ -594,4 +586,4 @@ print(results_final_controls)
 
 # save results
 write_rds(results_final_controls,
-          '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/results_with_se.rds')
+          '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/results_with_se_wages.rds')

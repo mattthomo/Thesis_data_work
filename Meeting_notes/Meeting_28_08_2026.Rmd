@@ -1,0 +1,162 @@
+---
+title: "Meeting_28_08_2026"
+output: pdf_document
+---
+
+```{r include=FALSE}
+library(tidyverse)
+library(kableExtra)
+```
+
+
+# Proposed layout 1
+
+```{r Wages and conscientiousness table, results='asis', echo=FALSE}
+wages_table <- read_rds('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/wages_table_for_paper.rds')
+
+wages_table %>% 
+    rename("(1)" = "Model_1",
+           "(2)" = "Model_2",
+           "(3)" = "Model_3",
+           "(4)" = "Model_4",
+           "(5)" = "Model_5",
+           "(6)" = "Model_6",
+           "(7)" = "Model_7",
+           "(8)" = "Model_8",
+           "Variable" = "term") %>% 
+    mutate(`(8)` = ifelse(`(8)` == "(0)", "(0.000)", `(8)`)) %>% 
+    kable(format = "latex",
+          caption = "Estimated coefficients from log wages regressions",
+          booktabs = TRUE,
+          linesep = "",
+          align = "lcccccccc",
+          escape = F) %>% 
+    kable_styling(latex_options = c("hold_position", 
+                                  "scale_down", 
+                                  "striped")) %>% 
+    column_spec(2,
+                border_left = T) %>% 
+    row_spec(22,
+             hline_after = T) %>% 
+    footnote(general = "$^{***}$ p<0.001, $^{**}$ p<0.01, $^{*}$ p<0.05. Standard errors in parentheses.",
+           general_title = "Note:",
+           footnote_as_chunk = TRUE,
+           escape = F) %>% 
+    add_header_above(c(" " = 1, 
+                       "OLS estimation" = 6, 
+                       "Structural equation modelling" = 2),
+                     escape = F) %>% 
+    add_header_above(c(" " = 1, 
+                       "Dependent variable: $Log$(Wages)" = 8),
+                     escape = F)
+```
+
+\newpage
+
+# Proposed layout 2
+
+```{r Total income and conscientiousness table, results='asis', echo=FALSE}
+inc_table <- read_rds('/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/inc_table_for_paper.rds')
+
+inc_table %>% 
+    rename("(1)" = "Model_1",
+           "(2)" = "Model_2",
+           "(3)" = "Model_3",
+           "(4)" = "Model_4",
+           "(5)" = "Model_5",
+           "(6)" = "Model_6",
+           "(7)" = "Model_7",
+           "(8)" = "Model_8",
+           "Variable" = "term") %>% 
+    mutate(`(8)` = ifelse(`(8)` == "(0)", "(0.000)", `(8)`)) %>% 
+    select(1:6) %>% 
+    kable(format = "latex",
+          caption = "Estimated coefficients from log total income regressions",
+          booktabs = TRUE,
+          linesep = "",
+          align = "lccccc",
+          escape = F) %>% 
+    kable_styling(latex_options = c("hold_position", 
+                                  "scale_down", 
+                                  "striped")) %>% 
+    column_spec(2,
+                border_left = T) %>% 
+    row_spec(22,
+             hline_after = T) %>% 
+    footnote(general = "$^{***}$ p<0.001, $^{**}$ p<0.01, $^{*}$ p<0.05. Standard errors in parentheses.",
+           general_title = "Note:",
+           footnote_as_chunk = TRUE,
+           escape = F) %>% 
+    add_header_above(c(" " = 1, 
+                       "OLS estimation" = 5),
+                     escape = F) %>% 
+    add_header_above(c(" " = 1, 
+                       "Dependent variable: $Log$(Total income)" = 5),
+                     escape = F)
+
+```
+
+```{r Simulation with standard errors, results='asis', echo=FALSE}
+sim_mod_simple <- readRDS(file = '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/simple_results_with_se.rds')
+
+empty_rows <- data.frame(
+  parameter = rep("", 16),
+  Value = rep("", 16)
+)
+
+sim_mod_simple <- rbind(
+  sim_mod_simple[1:10, ],
+  empty_rows,
+  sim_mod_simple[11:13, ]
+)
+
+sim_mod_simple <- sim_mod_simple %>% 
+    mutate(id = row_number())
+
+sim_mod_controls <- readRDS(file = '/Users/matthewthompson/Documents/Stellenbosch University/Masters/Research Assignment/Data_work/output/results_with_se.rds')
+
+sim_mod_controls %>% 
+    mutate(id = row_number()) %>% 
+    left_join(sim_mod_simple %>% 
+                  select(Value, id),
+              by = "id") %>% 
+    select(parameter, `Value.y`, `Value.x`) %>% 
+    rename("(1)" = "Value.y",
+           "(2)" = "Value.x",
+           "Parameter" = "parameter") %>% 
+    mutate(Parameter = case_when(
+        str_detect(Parameter, "beta") ~ "Constant",
+        str_detect(Parameter, "educ_squared") ~ "Education$^{2}$",
+        str_detect(Parameter, "age_squared") ~ "Age$^{2}$",
+        str_detect(Parameter, "age") ~ "Age",
+        str_detect(Parameter, "alpha") ~ "Conscientiousness",
+        str_detect(Parameter, "gamma") ~ "Education",
+        str_detect(Parameter, "female") ~ "Female",
+        str_detect(Parameter, "coloured") ~ "Coloured",
+        str_detect(Parameter, "asian") ~ "Asian/Indian",
+        str_detect(Parameter, "white") ~ "White",
+        str_detect(Parameter, "wealth") ~ "Wealth",
+        str_detect(Parameter, "u_consc") ~ "Conscientiousness",
+        str_detect(Parameter, "u_educ") ~ "Education",
+        str_detect(Parameter, "u_income") ~ "Log(Income)",
+        TRUE ~ Parameter
+    ),
+    `(1)` = ifelse(is.na(`(1)`), "", `(1)`),
+    `(2)` = ifelse(`(2)` == "(0)", "(0.000)", `(2)`)) %>% 
+    kable(format = "latex",
+          caption = "Simulation result on full sample without and with controls",
+          booktabs = TRUE,
+          linesep = "",
+          align = "lcc",
+          escape = F) %>% 
+    pack_rows("Panel A: Dependent variable: Education", 1, 4) %>% 
+    pack_rows("Panel B: Dependent variable: $Log$(Total Income)", 5, 26, escape = F) %>% 
+    pack_rows("Panel C: Standard deviations of error terms", 27, 29) %>% 
+    kable_styling(latex_options = c("hold_position", 
+                                  "scale_down", 
+                                  "striped")) %>% 
+    column_spec(2,
+                border_left = T)
+```
+
+
